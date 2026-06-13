@@ -163,7 +163,7 @@ async function loadModel() {
       setError("请通过 HTTP/HTTPS 打开，本地 file:// 无法加载模型。");
       return;
     }
-    ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/";
+    ort.env.wasm.wasmPaths = "./";
     ort.env.wasm.numThreads = 1;
     const classResponse = await fetch(IDX_TO_CLASS_PATH);
     idxToClass = await classResponse.json();
