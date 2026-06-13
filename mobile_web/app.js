@@ -19,7 +19,6 @@ const readyBadge = document.getElementById("readyBadge");
 const predLabel = document.getElementById("predLabel");
 const confidence = document.getElementById("confidence");
 const topkBars = document.getElementById("topkBars");
-const debugStatus = document.getElementById("debugStatus");
 
 const video = document.getElementById("video");
 const captureCanvas = document.getElementById("captureCanvas");
@@ -42,9 +41,7 @@ let loadStartedAt = 0;
 
 function logStep(message, data) {
   const elapsed = loadStartedAt ? `T+${((Date.now() - loadStartedAt) / 1000).toFixed(1)}s ` : "";
-  const text = data === undefined ? `${elapsed}${message}` : `${elapsed}${message}: ${JSON.stringify(data)}`;
   console.log(`[BMW] ${message}`, data === undefined ? "" : data);
-  debugStatus.textContent = text;
 }
 
 function setReady(text, ok) {
@@ -63,7 +60,6 @@ function setError(text, error) {
   predLabel.textContent = fullText;
   confidence.textContent = "-";
   topkBars.innerHTML = "";
-  debugStatus.textContent = fullText;
   console.error(`[BMW] ${fullText}`, error || "");
 }
 

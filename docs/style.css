@@ -217,29 +217,6 @@ input[type="file"] {
   gap: 7px;
 }
 
-.debug-box {
-  display: none;
-  gap: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--line);
-}
-
-.debug-box span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.debug-box pre {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: #334155;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .bar-row {
   display: grid;
   gap: 4px;
