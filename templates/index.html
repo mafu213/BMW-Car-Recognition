@@ -8,7 +8,7 @@
 </head>
 <body>
   <main class="app-shell">
-    <section class="topbar">
+    <header class="topbar">
       <div>
         <h1>BMW 车型识别</h1>
         <p>{{ model_name }} · {{ device }}</p>
@@ -16,7 +16,7 @@
       <span class="status {% if model_ready %}ready{% else %}error{% endif %}">
         {% if model_ready %}模型就绪{% else %}模型未加载{% endif %}
       </span>
-    </section>
+    </header>
 
     {% if load_error %}
     <section class="notice">
@@ -24,29 +24,77 @@
     </section>
     {% endif %}
 
-    <section class="workspace">
+    <section class="result-panel" aria-live="polite">
+      <div class="result-main">
+        <span>预测车型</span>
+        <strong id="className">等待识别</strong>
+      </div>
+      <div class="confidence">
+        <span>置信度</span>
+        <strong id="confidenceValue">-</strong>
+      </div>
+      <div id="bars" class="bars"></div>
+    </section>
+
+    <section class="tool-section camera-section">
+      <div class="section-head">
+        <h2>摄像头实时识别区</h2>
+        <p>实时预览需要浏览器允许摄像头权限；iPhone 局域网 HTTP 访问时可能不可用。</p>
+      </div>
+      <div class="camera-box">
+        <video id="cameraVideo" playsinline autoplay muted></video>
+        <div id="cameraPlaceholder" class="camera-placeholder">点击下方按钮打开摄像头</div>
+      </div>
+      <canvas id="captureCanvas" hidden></canvas>
+      <div id="cameraHint" class="hint" hidden>
+        当前浏览器无法直接打开实时摄像头，请使用下方拍照上传方式。
+      </div>
+      <div class="button-row">
+        <button id="openCameraButton" type="button">打开摄像头</button>
+        <button id="captureButton" type="button" disabled>拍照识别</button>
+      </div>
+    </section>
+
+    <section class="tool-section">
+      <div class="section-head">
+        <h2>拍照上传备用区</h2>
+        <p>现场验收推荐使用此方式，iPhone Safari 会直接调用相机拍照。</p>
+      </div>
       <div class="preview-panel">
-        <img id="previewImage" alt="上传图片预览">
-        <div id="emptyPreview" class="empty-preview">选择 BMW 图片</div>
+        <img id="cameraUploadPreview" alt="拍照上传预览">
+        <div id="cameraUploadEmpty" class="empty-preview">拍老师给的图片</div>
       </div>
-
-      <div class="controls">
-        <label class="file-button" for="imageInput">选择图片</label>
-        <input id="imageInput" type="file" accept="image/*" capture="environment">
-        <button id="predictButton" type="button" disabled>开始识别</button>
+      <div class="button-row">
+        <label class="file-button primary-file" for="cameraUploadInput">拍照上传识别</label>
+        <input id="cameraUploadInput" type="file" accept="image/*" capture="environment">
+        <button id="cameraUploadButton" type="button" disabled>识别照片</button>
       </div>
+    </section>
 
-      <section id="resultPanel" class="result-panel">
-        <div class="result-main">
-          <span>预测车型</span>
-          <strong id="className">-</strong>
-        </div>
-        <div class="confidence">
-          <span>置信度</span>
-          <strong id="confidenceValue">-</strong>
-        </div>
-        <div id="bars" class="bars"></div>
-      </section>
+    <section class="tool-section">
+      <div class="section-head">
+        <h2>本地图片上传区</h2>
+        <p>可从相册或文件中选择已有图片。</p>
+      </div>
+      <div class="preview-panel">
+        <img id="localPreview" alt="本地图片预览">
+        <div id="localEmpty" class="empty-preview">选择 BMW 图片</div>
+      </div>
+      <div class="button-row">
+        <label class="file-button" for="localImageInput">选择图片</label>
+        <input id="localImageInput" type="file" accept="image/*">
+        <button id="localUploadButton" type="button" disabled>识别图片</button>
+      </div>
+    </section>
+
+    <section class="classes-panel">
+      <h2>支持类别</h2>
+      <ul>
+        <li><strong>28</strong>: BMW 1 Series Coupe 2012</li>
+        <li><strong>29</strong>: BMW 3 Series Sedan 2012</li>
+        <li><strong>32</strong>: BMW X5 SUV 2007</li>
+        <li><strong>37</strong>: BMW X3 SUV 2012</li>
+      </ul>
     </section>
   </main>
   <script src="/static/script.js"></script>

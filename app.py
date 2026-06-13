@@ -39,9 +39,11 @@ def label_for(class_name):
 
 
 def load_model_once():
+    """启动时加载模型；失败时保留错误信息给网页显示。"""
     global model, idx_to_class, class_descriptions, img_size, model_name, load_error
     if model is not None or load_error is not None:
         return
+
     try:
         if not MODEL_PATH.exists():
             raise FileNotFoundError(f"缺少模型文件：{MODEL_PATH}")
@@ -95,14 +97,19 @@ def index(request: Request):
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
+    """接收普通上传、canvas JPEG Blob、iPhone 拍照文件并返回 Top-4 概率。"""
     load_model_once()
     if model is None:
         raise HTTPException(status_code=500, detail=f"模型未加载：{load_error}")
-    if not file.content_type or not file.content_type.startswith("image/"):
+
+    content_type = file.content_type or ""
+    if content_type and not content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="请上传图片文件。")
 
     try:
         content = await file.read()
+        if not content:
+            raise ValueError("图片内容为空")
         image = Image.open(io.BytesIO(content)).convert("RGB")
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"图片读取失败：{exc}") from exc
@@ -115,19 +122,29 @@ async def predict(file: UploadFile = File(...)):
 
     top_k = min(4, len(idx_to_class))
     values, indices = torch.topk(probs, k=top_k)
+
+    topk = []
     top4 = []
     for value, index in zip(values.tolist(), indices.tolist()):
         class_name = idx_to_class[int(index)]
+        display_name = label_for(class_name)
+        probability = float(value)
+        topk.append({"label": display_name, "prob": probability})
         top4.append({
             "class_name": class_name,
-            "display_name": label_for(class_name),
-            "probability": float(value),
+            "display_name": display_name,
+            "probability": probability,
         })
+
     best = top4[0]
     return JSONResponse({
+        # 新网页和验收文档使用的字段
+        "pred_label": best["display_name"],
+        "confidence": best["probability"],
+        "topk": topk,
+        # 兼容旧网页或旧脚本的字段
         "predicted_class": best["class_name"],
         "display_name": best["display_name"],
-        "confidence": best["probability"],
         "top4": top4,
         "model_name": model_name,
         "device": str(device),

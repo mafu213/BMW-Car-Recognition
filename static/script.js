@@ -1,24 +1,61 @@
-const imageInput = document.getElementById("imageInput");
-const previewImage = document.getElementById("previewImage");
-const emptyPreview = document.getElementById("emptyPreview");
-const predictButton = document.getElementById("predictButton");
-const className = document.getElementById("className");
-const confidenceValue = document.getElementById("confidenceValue");
-const bars = document.getElementById("bars");
+const classNameEl = document.getElementById("className");
+const confidenceValueEl = document.getElementById("confidenceValue");
+const barsEl = document.getElementById("bars");
 
-let selectedFile = null;
+const cameraVideo = document.getElementById("cameraVideo");
+const captureCanvas = document.getElementById("captureCanvas");
+const cameraPlaceholder = document.getElementById("cameraPlaceholder");
+const cameraHint = document.getElementById("cameraHint");
+const openCameraButton = document.getElementById("openCameraButton");
+const captureButton = document.getElementById("captureButton");
 
-function setBusy(isBusy) {
-  predictButton.disabled = isBusy || !selectedFile;
-  predictButton.textContent = isBusy ? "识别中..." : "开始识别";
-}
+const cameraUploadInput = document.getElementById("cameraUploadInput");
+const cameraUploadButton = document.getElementById("cameraUploadButton");
+const cameraUploadPreview = document.getElementById("cameraUploadPreview");
+const cameraUploadEmpty = document.getElementById("cameraUploadEmpty");
+
+const localImageInput = document.getElementById("localImageInput");
+const localUploadButton = document.getElementById("localUploadButton");
+const localPreview = document.getElementById("localPreview");
+const localEmpty = document.getElementById("localEmpty");
+
+let cameraStream = null;
+let cameraUploadFile = null;
+let localImageFile = null;
 
 function percent(value) {
-  return `${(value * 100).toFixed(2)}%`;
+  return `${(Number(value) * 100).toFixed(2)}%`;
 }
 
-function renderBars(items) {
-  bars.innerHTML = "";
+function setButtonBusy(button, busy, textWhenIdle) {
+  button.disabled = busy;
+  button.textContent = busy ? "识别中..." : textWhenIdle;
+}
+
+function setStatusMessage(message) {
+  classNameEl.textContent = message;
+  confidenceValueEl.textContent = "-";
+  barsEl.innerHTML = "";
+}
+
+function normalizeTopK(data) {
+  if (Array.isArray(data.topk)) {
+    return data.topk.map((item) => ({
+      label: item.label,
+      prob: item.prob,
+    }));
+  }
+  if (Array.isArray(data.top4)) {
+    return data.top4.map((item) => ({
+      label: item.display_name || item.class_name,
+      prob: item.probability,
+    }));
+  }
+  return [];
+}
+
+function renderTopK(items) {
+  barsEl.innerHTML = "";
   items.forEach((item) => {
     const row = document.createElement("div");
     row.className = "bar-row";
@@ -28,51 +65,38 @@ function renderBars(items) {
 
     const label = document.createElement("span");
     label.className = "bar-label";
-    label.textContent = item.display_name;
+    label.textContent = item.label;
 
     const value = document.createElement("span");
-    value.textContent = percent(item.probability);
+    value.className = "bar-value";
+    value.textContent = percent(item.prob);
 
     const track = document.createElement("div");
     track.className = "bar-track";
 
     const fill = document.createElement("div");
     fill.className = "bar-fill";
-    fill.style.width = percent(item.probability);
+    fill.style.width = percent(item.prob);
 
     head.append(label, value);
     track.append(fill);
     row.append(head, track);
-    bars.append(row);
+    barsEl.append(row);
   });
 }
 
-imageInput.addEventListener("change", () => {
-  selectedFile = imageInput.files && imageInput.files[0] ? imageInput.files[0] : null;
-  if (!selectedFile) {
-    previewImage.style.display = "none";
-    emptyPreview.style.display = "grid";
-    setBusy(false);
+async function uploadAndPredict(blobOrFile, filename, busyButton, idleText) {
+  if (!blobOrFile) {
     return;
   }
 
-  const url = URL.createObjectURL(selectedFile);
-  previewImage.onload = () => URL.revokeObjectURL(url);
-  previewImage.src = url;
-  previewImage.style.display = "block";
-  emptyPreview.style.display = "none";
-  className.textContent = "-";
-  confidenceValue.textContent = "-";
-  bars.innerHTML = "";
-  setBusy(false);
-});
-
-predictButton.addEventListener("click", async () => {
-  if (!selectedFile) return;
-  setBusy(true);
+  if (busyButton) {
+    setButtonBusy(busyButton, true, idleText);
+  }
+  setStatusMessage("正在识别...");
 
   const formData = new FormData();
-  formData.append("file", selectedFile);
+  formData.append("file", blobOrFile, filename || "bmw_capture.jpg");
 
   try {
     const response = await fetch("/predict", {
@@ -84,15 +108,124 @@ predictButton.addEventListener("click", async () => {
       throw new Error(data.detail || "识别失败");
     }
 
-    className.textContent = data.display_name;
-    confidenceValue.textContent = percent(data.confidence);
-    renderBars(data.top4);
+    classNameEl.textContent = data.pred_label || data.display_name || data.predicted_class || "-";
+    confidenceValueEl.textContent = percent(data.confidence || 0);
+    renderTopK(normalizeTopK(data));
   } catch (error) {
-    className.textContent = "识别失败";
-    confidenceValue.textContent = "-";
-    bars.innerHTML = "";
-    alert(error.message);
+    setStatusMessage("识别失败");
+    alert(error.message || "识别失败，请重新拍照或上传图片。");
   } finally {
-    setBusy(false);
+    if (busyButton) {
+      setButtonBusy(busyButton, false, idleText);
+    }
+    refreshButtons();
   }
+}
+
+async function openCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showCameraFallback();
+    return;
+  }
+
+  try {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    });
+    cameraVideo.srcObject = cameraStream;
+    cameraPlaceholder.hidden = true;
+    cameraHint.hidden = true;
+    captureButton.disabled = false;
+    setStatusMessage("摄像头已打开，请对准图片后拍照识别");
+  } catch (error) {
+    console.warn("Camera open failed:", error);
+    showCameraFallback();
+  }
+}
+
+function showCameraFallback() {
+  cameraHint.hidden = false;
+  cameraPlaceholder.hidden = false;
+  captureButton.disabled = true;
+  setStatusMessage("请使用拍照上传备用区");
+}
+
+function captureAndPredict() {
+  if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) {
+    showCameraFallback();
+    return;
+  }
+
+  captureCanvas.width = cameraVideo.videoWidth;
+  captureCanvas.height = cameraVideo.videoHeight;
+  const context = captureCanvas.getContext("2d");
+  context.drawImage(cameraVideo, 0, 0, captureCanvas.width, captureCanvas.height);
+
+  captureCanvas.toBlob(
+    (blob) => {
+      if (!blob) {
+        alert("拍照失败，请使用拍照上传备用区。");
+        return;
+      }
+      uploadAndPredict(blob, "camera_capture.jpg", captureButton, "拍照识别");
+    },
+    "image/jpeg",
+    0.92,
+  );
+}
+
+function previewFile(file, imageEl, emptyEl) {
+  if (!file) {
+    imageEl.removeAttribute("src");
+    imageEl.style.display = "none";
+    emptyEl.style.display = "grid";
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  imageEl.onload = () => URL.revokeObjectURL(url);
+  imageEl.src = url;
+  imageEl.style.display = "block";
+  emptyEl.style.display = "none";
+}
+
+function refreshButtons() {
+  cameraUploadButton.disabled = !cameraUploadFile;
+  localUploadButton.disabled = !localImageFile;
+  if (cameraStream) {
+    captureButton.disabled = false;
+  }
+}
+
+openCameraButton.addEventListener("click", openCamera);
+captureButton.addEventListener("click", captureAndPredict);
+
+cameraUploadInput.addEventListener("change", () => {
+  cameraUploadFile = cameraUploadInput.files && cameraUploadInput.files[0] ? cameraUploadInput.files[0] : null;
+  previewFile(cameraUploadFile, cameraUploadPreview, cameraUploadEmpty);
+  setStatusMessage(cameraUploadFile ? "照片已选择，点击识别照片" : "等待识别");
+  refreshButtons();
 });
+
+cameraUploadButton.addEventListener("click", () => {
+  uploadAndPredict(cameraUploadFile, cameraUploadFile?.name || "iphone_capture.jpg", cameraUploadButton, "识别照片");
+});
+
+localImageInput.addEventListener("change", () => {
+  localImageFile = localImageInput.files && localImageInput.files[0] ? localImageInput.files[0] : null;
+  previewFile(localImageFile, localPreview, localEmpty);
+  setStatusMessage(localImageFile ? "图片已选择，点击识别图片" : "等待识别");
+  refreshButtons();
+});
+
+localUploadButton.addEventListener("click", () => {
+  uploadAndPredict(localImageFile, localImageFile?.name || "local_image.jpg", localUploadButton, "识别图片");
+});
+
+if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  cameraHint.hidden = false;
+}

@@ -1,0 +1,95 @@
+{
+  "checked_images": 10,
+  "top1_consistent": true,
+  "mismatch_count": 0,
+  "max_abs_error": 1.621246337890625e-05,
+  "mismatches": [],
+  "samples": [
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\28\\002240.jpg",
+      "true_class": "28",
+      "torch_top1": 0,
+      "onnx_top1": 0,
+      "max_abs_error": 5.364418029785156e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\28\\002256.jpg",
+      "true_class": "28",
+      "torch_top1": 0,
+      "onnx_top1": 0,
+      "max_abs_error": 9.059906005859375e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\29\\002329.jpg",
+      "true_class": "29",
+      "torch_top1": 2,
+      "onnx_top1": 2,
+      "max_abs_error": 5.4836273193359375e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\37\\003008.jpg",
+      "true_class": "37",
+      "torch_top1": 3,
+      "onnx_top1": 3,
+      "max_abs_error": 1.621246337890625e-05
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\37\\003000.jpg",
+      "true_class": "37",
+      "torch_top1": 3,
+      "onnx_top1": 3,
+      "max_abs_error": 3.0994415283203125e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\32\\002588.jpg",
+      "true_class": "32",
+      "torch_top1": 2,
+      "onnx_top1": 2,
+      "max_abs_error": 3.0994415283203125e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\32\\002585.jpg",
+      "true_class": "32",
+      "torch_top1": 1,
+      "onnx_top1": 1,
+      "max_abs_error": 5.125999450683594e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\28\\002245.jpg",
+      "true_class": "28",
+      "torch_top1": 1,
+      "onnx_top1": 1,
+      "max_abs_error": 7.808208465576172e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\28\\002259.jpg",
+      "true_class": "28",
+      "torch_top1": 2,
+      "onnx_top1": 2,
+      "max_abs_error": 9.298324584960938e-06
+    },
+    {
+      "image_path": "D:\\BMW\\BMW\\test\\29\\002332.jpg",
+      "true_class": "29",
+      "torch_top1": 3,
+      "onnx_top1": 3,
+      "max_abs_error": 1.4901161193847656e-05
+    }
+  ],
+  "model_name": "mobilenet_v3_small",
+  "onnx_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\mobile_web\\model\\bmw_model.onnx",
+  "input_name": "input",
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "input_dtype": "float32",
+  "output_name": "logits",
+  "output_shape": [
+    1,
+    4
+  ],
+  "best_val_acc": 0.6875
+}

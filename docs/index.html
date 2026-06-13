@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BMW 四类车型识别系统</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <h1>BMW 四类车型识别系统</h1>
+        <p id="modelStatus">模型加载中...</p>
+      </div>
+      <span id="readyBadge" class="status">准备中</span>
+    </header>
+
+    <section class="result-card" aria-live="polite">
+      <div>
+        <span>预测车型</span>
+        <strong id="predLabel">等待识别</strong>
+      </div>
+      <div>
+        <span>置信度</span>
+        <strong id="confidence">-</strong>
+      </div>
+      <div id="topkBars" class="bars"></div>
+    </section>
+
+    <section class="panel tip-panel">
+      <h2>现场验收提示</h2>
+      <ol>
+        <li>打开网页后等待模型加载完成。</li>
+        <li>点击“打开摄像头”。</li>
+        <li>对准老师给的车辆图片。</li>
+        <li>点击“拍照识别”。</li>
+        <li>如果实时摄像头打不开，使用“拍照上传识别”。</li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>摄像头识别</h2>
+        <p>优先调用 iPhone 后置摄像头，本地浏览器直接完成 ONNX 推理。</p>
+      </div>
+      <div class="camera-box">
+        <video id="video" playsinline autoplay muted></video>
+        <div id="cameraPlaceholder" class="placeholder">点击“打开摄像头”</div>
+      </div>
+      <canvas id="captureCanvas" hidden></canvas>
+      <div id="cameraHint" class="warning" hidden>实时摄像头不可用，请使用下方拍照上传功能。</div>
+      <div class="button-row">
+        <button id="openCameraBtn" type="button">打开摄像头</button>
+        <button id="captureBtn" type="button" disabled>拍照识别</button>
+        <button id="retakeBtn" type="button">重新拍照</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>拍照上传识别</h2>
+        <p>实时摄像头不稳定时，使用 iPhone 原生相机拍照后在网页中识别。</p>
+      </div>
+      <label class="file-button" for="cameraFile">拍照上传识别</label>
+      <input id="cameraFile" type="file" accept="image/*" capture="environment">
+    </section>
+
+    <section class="panel preview-panel">
+      <h2>图片预览</h2>
+      <div class="preview-box">
+        <img id="previewImage" alt="拍照或上传图片预览">
+        <div id="previewPlaceholder" class="placeholder">暂无图片</div>
+      </div>
+    </section>
+
+    <section class="panel classes-panel">
+      <h2>类别说明</h2>
+      <ul>
+        <li><strong>28</strong>: BMW 1 Series Coupe 2012</li>
+        <li><strong>29</strong>: BMW 3 Series Sedan 2012</li>
+        <li><strong>32</strong>: BMW X5 SUV 2007</li>
+        <li><strong>37</strong>: BMW X3 SUV 2012</li>
+      </ul>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
