@@ -15,6 +15,7 @@ const readyBadge = document.getElementById("readyBadge");
 const predLabel = document.getElementById("predLabel");
 const confidence = document.getElementById("confidence");
 const topkBars = document.getElementById("topkBars");
+const debugStatus = document.getElementById("debugStatus");
 
 const video = document.getElementById("video");
 const captureCanvas = document.getElementById("captureCanvas");
@@ -24,23 +25,47 @@ const openCameraBtn = document.getElementById("openCameraBtn");
 const captureBtn = document.getElementById("captureBtn");
 const retakeBtn = document.getElementById("retakeBtn");
 const cameraFile = document.getElementById("cameraFile");
+const uploadPredictBtn = document.getElementById("uploadPredictBtn");
+const testModelBtn = document.getElementById("testModelBtn");
 const previewImage = document.getElementById("previewImage");
 const previewPlaceholder = document.getElementById("previewPlaceholder");
 
 let session = null;
 let idxToClass = {};
 let stream = null;
+let selectedImage = null;
+
+function logStep(message, data) {
+  const text = data === undefined ? message : `${message}: ${JSON.stringify(data)}`;
+  console.log(`[BMW] ${message}`, data === undefined ? "" : data);
+  debugStatus.textContent = text;
+}
 
 function setReady(text, ok) {
   modelStatus.textContent = text;
   readyBadge.textContent = ok ? "模型就绪" : "准备中";
   readyBadge.className = ok ? "status ready" : "status";
+  logStep(text);
 }
 
-function setError(text) {
-  modelStatus.textContent = text;
+function setError(text, error) {
+  const detail = error && (error.message || String(error)) ? `：${error.message || String(error)}` : "";
+  const fullText = `${text}${detail}`;
+  modelStatus.textContent = fullText;
   readyBadge.textContent = "不可用";
   readyBadge.className = "status error";
+  predLabel.textContent = fullText;
+  confidence.textContent = "-";
+  topkBars.innerHTML = "";
+  debugStatus.textContent = fullText;
+  console.error(`[BMW] ${fullText}`, error || "");
+}
+
+function setWorking(text) {
+  predLabel.textContent = text;
+  confidence.textContent = "-";
+  topkBars.innerHTML = "";
+  logStep(text);
 }
 
 function displayName(classId) {
@@ -48,12 +73,13 @@ function displayName(classId) {
 }
 
 function percent(value) {
-  return `${(value * 100).toFixed(2)}%`;
+  return `${(Number(value) * 100).toFixed(2)}%`;
 }
 
 function softmax(logits) {
-  const maxValue = Math.max(...logits);
-  const exps = Array.from(logits, (v) => Math.exp(v - maxValue));
+  const values = Array.from(logits);
+  const maxValue = Math.max(...values);
+  const exps = values.map((v) => Math.exp(v - maxValue));
   const sum = exps.reduce((a, b) => a + b, 0);
   return exps.map((v) => v / sum);
 }
@@ -90,16 +116,20 @@ function renderTopK(items) {
 }
 
 function renderResult(topk) {
+  if (!topk.length) {
+    throw new Error("Top-4 结果为空");
+  }
   const best = topk[0];
   predLabel.textContent = best.label;
   confidence.textContent = percent(best.prob);
   renderTopK(topk);
+  logStep("结果已显示", topk);
 }
 
 function showPreviewFromCanvas(canvas) {
   previewImage.src = canvas.toDataURL("image/jpeg", 0.92);
   previewImage.style.display = "block";
-  previewPlaceholder.style.display = "none";
+  previewPlaceholder.hidden = true;
 }
 
 function drawSourceToSquareCanvas(source) {
@@ -107,46 +137,74 @@ function drawSourceToSquareCanvas(source) {
   canvas.width = IMG_SIZE;
   canvas.height = IMG_SIZE;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    throw new Error("无法创建 2D canvas context");
+  }
   ctx.drawImage(source, 0, 0, IMG_SIZE, IMG_SIZE);
   return canvas;
 }
 
 function preprocess(source) {
-  const canvas = drawSourceToSquareCanvas(source);
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const imageData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
-  const input = new Float32Array(1 * 3 * IMG_SIZE * IMG_SIZE);
-  const planeSize = IMG_SIZE * IMG_SIZE;
-
-  for (let y = 0; y < IMG_SIZE; y += 1) {
-    for (let x = 0; x < IMG_SIZE; x += 1) {
-      const pixelIndex = (y * IMG_SIZE + x) * 4;
-      const outIndex = y * IMG_SIZE + x;
-      const r = imageData[pixelIndex] / 255;
-      const g = imageData[pixelIndex + 1] / 255;
-      const b = imageData[pixelIndex + 2] / 255;
-      input[outIndex] = (r - MEAN[0]) / STD[0];
-      input[planeSize + outIndex] = (g - MEAN[1]) / STD[1];
-      input[2 * planeSize + outIndex] = (b - MEAN[2]) / STD[2];
+  try {
+    const canvas = drawSourceToSquareCanvas(source);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const imageData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+    if (!imageData || imageData.length !== IMG_SIZE * IMG_SIZE * 4) {
+      throw new Error("canvas image data empty");
     }
+
+    const input = new Float32Array(1 * 3 * IMG_SIZE * IMG_SIZE);
+    const planeSize = IMG_SIZE * IMG_SIZE;
+    for (let y = 0; y < IMG_SIZE; y += 1) {
+      for (let x = 0; x < IMG_SIZE; x += 1) {
+        const pixelIndex = (y * IMG_SIZE + x) * 4;
+        const outIndex = y * IMG_SIZE + x;
+        const r = imageData[pixelIndex] / 255;
+        const g = imageData[pixelIndex + 1] / 255;
+        const b = imageData[pixelIndex + 2] / 255;
+        input[outIndex] = (r - MEAN[0]) / STD[0];
+        input[planeSize + outIndex] = (g - MEAN[1]) / STD[1];
+        input[2 * planeSize + outIndex] = (b - MEAN[2]) / STD[2];
+      }
+    }
+    logStep("图像预处理完成", { shape: [1, 3, IMG_SIZE, IMG_SIZE], length: input.length });
+    console.log("[BMW] 输入 tensor shape", [1, 3, IMG_SIZE, IMG_SIZE]);
+    return input;
+  } catch (error) {
+    throw new Error(`预处理失败：${error.message || error}`);
   }
-  return input;
 }
 
-async function runInference(source) {
+async function predictImage(source) {
   if (!session) {
-    alert("模型仍在加载，请稍等。");
-    return;
+    throw new Error("模型未加载完成");
   }
-  predLabel.textContent = "正在识别...";
-  confidence.textContent = "-";
-  topkBars.innerHTML = "";
+
+  setWorking("开始推理准备...");
+  const inputName = session.inputNames[0];
+  const outputName = session.outputNames[0];
+  if (!inputName) {
+    throw new Error("ONNX input name not found");
+  }
+  if (!outputName) {
+    throw new Error("ONNX output name not found");
+  }
+  console.log("[BMW] ONNX inputNames", session.inputNames);
+  console.log("[BMW] ONNX outputNames", session.outputNames);
 
   const input = preprocess(source);
   const tensor = new ort.Tensor("float32", input, [1, 3, IMG_SIZE, IMG_SIZE]);
-  const output = await session.run({ input: tensor });
-  const logits = output.logits.data;
+  logStep("开始推理", { inputName, outputName });
+  const results = await session.run({ [inputName]: tensor });
+  const output = results[outputName];
+  if (!output || !output.data) {
+    throw new Error(`推理失败：output tensor not found (${outputName})`);
+  }
+
+  const logits = Array.from(output.data);
+  console.log("[BMW] logits", logits);
   const probs = softmax(logits);
+  console.log("[BMW] softmax 概率", probs);
   const topk = probs
     .map((prob, index) => {
       const classId = idxToClass[String(index)] || String(index);
@@ -154,7 +212,29 @@ async function runInference(source) {
     })
     .sort((a, b) => b.prob - a.prob)
     .slice(0, 4);
+  console.log("[BMW] Top-4 结果", topk);
+  logStep("推理完成", { outputName, logitsLength: logits.length });
   renderResult(topk);
+}
+
+async function captureAndPredict() {
+  try {
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error(`canvas 截图失败：video size is ${video.videoWidth}x${video.videoHeight}`);
+    }
+    captureCanvas.width = video.videoWidth;
+    captureCanvas.height = video.videoHeight;
+    const ctx = captureCanvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("canvas 截图失败：无法创建 2D context");
+    }
+    ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
+    showPreviewFromCanvas(captureCanvas);
+    logStep("已拍照", { width: captureCanvas.width, height: captureCanvas.height });
+    await predictImage(captureCanvas);
+  } catch (error) {
+    setError("推理失败", error);
+  }
 }
 
 async function loadModel() {
@@ -163,6 +243,7 @@ async function loadModel() {
       setError("请通过 HTTP/HTTPS 打开，本地 file:// 无法加载模型。");
       return;
     }
+    logStep("模型加载中");
     ort.env.wasm.wasmPaths = new URL("vendor/", window.location.href).href;
     ort.env.wasm.numThreads = 1;
     const timeout = new Promise((_, reject) => {
@@ -174,81 +255,138 @@ async function loadModel() {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
     }), timeout]);
-    setReady("模型已加载，可拍照识别", true);
+    console.log("[BMW] ONNX inputNames", session.inputNames);
+    console.log("[BMW] ONNX outputNames", session.outputNames);
+    setReady("模型加载完成，可拍照识别", true);
   } catch (error) {
-    console.error(error);
-    setError(`模型加载失败：${error.message || error}`);
+    setError("模型加载失败", error);
   }
 }
 
 async function openCamera() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    cameraHint.hidden = false;
-    return;
-  }
   try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("当前浏览器不支持 getUserMedia");
+    }
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
+    logStep("正在打开摄像头");
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: "environment" } },
       audio: false,
     });
     video.srcObject = stream;
+    await video.play();
+    await new Promise((resolve) => {
+      if (video.videoWidth && video.videoHeight) {
+        resolve();
+      } else {
+        video.onloadedmetadata = resolve;
+      }
+    });
     cameraPlaceholder.hidden = true;
+    cameraPlaceholder.style.display = "none";
     cameraHint.hidden = true;
     captureBtn.disabled = false;
+    logStep("摄像头打开成功", { width: video.videoWidth, height: video.videoHeight });
   } catch (error) {
-    console.warn(error);
     cameraHint.hidden = false;
     captureBtn.disabled = true;
+    setError("摄像头打开失败", error);
   }
-}
-
-async function captureAndPredict() {
-  if (!video.videoWidth || !video.videoHeight) {
-    cameraHint.hidden = false;
-    return;
-  }
-  captureCanvas.width = video.videoWidth;
-  captureCanvas.height = video.videoHeight;
-  const ctx = captureCanvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, captureCanvas.width, captureCanvas.height);
-  showPreviewFromCanvas(captureCanvas);
-  await runInference(captureCanvas);
 }
 
 function resetResult() {
   predLabel.textContent = "等待识别";
   confidence.textContent = "-";
   topkBars.innerHTML = "";
+  logStep("等待操作");
 }
 
-async function loadFileAndPredict(file) {
-  if (!file) {
-    return;
+async function loadFileToImage(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error("未选择图片"));
+      return;
+    }
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      previewImage.src = url;
+      previewImage.style.display = "block";
+      previewPlaceholder.hidden = true;
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("图片读取失败，请重新拍照。"));
+    };
+    image.src = url;
+  });
+}
+
+async function uploadAndPredict() {
+  try {
+    if (!selectedImage) {
+      throw new Error("请先拍照或选择图片");
+    }
+    logStep("使用上传图片识别");
+    await predictImage(selectedImage);
+  } catch (error) {
+    setError("推理失败", error);
   }
-  const image = new Image();
-  const url = URL.createObjectURL(file);
-  image.onload = async () => {
-    previewImage.src = url;
-    previewImage.style.display = "block";
-    previewPlaceholder.style.display = "none";
-    await runInference(image);
-  };
-  image.onerror = () => {
-    URL.revokeObjectURL(url);
-    alert("图片读取失败，请重新拍照。");
-  };
-  image.src = url;
 }
 
-openCameraBtn.addEventListener("click", openCamera);
-captureBtn.addEventListener("click", captureAndPredict);
+function createDemoCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 420;
+  const ctx = canvas.getContext("2d");
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#f97316");
+  gradient.addColorStop(1, "#111827");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 42px Arial";
+  ctx.fillText("BMW demo test", 110, 210);
+  return canvas;
+}
+
+async function testModelInference() {
+  try {
+    const source = selectedImage || createDemoCanvas();
+    if (!selectedImage) {
+      showPreviewFromCanvas(source);
+    }
+    logStep(selectedImage ? "测试模型推理：使用上传图片" : "测试模型推理：使用内置 demo canvas");
+    await predictImage(source);
+  } catch (error) {
+    setError("测试推理失败", error);
+  }
+}
+
+if (!openCameraBtn || !captureBtn) {
+  setError("按钮绑定失败", new Error("openCameraBtn 或 captureBtn 不存在"));
+} else {
+  openCameraBtn.addEventListener("click", openCamera);
+  captureBtn.addEventListener("click", captureAndPredict);
+}
 retakeBtn.addEventListener("click", resetResult);
-cameraFile.addEventListener("change", () => {
-  const file = cameraFile.files && cameraFile.files[0] ? cameraFile.files[0] : null;
-  loadFileAndPredict(file);
+uploadPredictBtn.addEventListener("click", uploadAndPredict);
+testModelBtn.addEventListener("click", testModelInference);
+cameraFile.addEventListener("change", async () => {
+  try {
+    const file = cameraFile.files && cameraFile.files[0] ? cameraFile.files[0] : null;
+    selectedImage = await loadFileToImage(file);
+    uploadPredictBtn.disabled = false;
+    logStep("已选择照片，可点击上传照片识别", { width: selectedImage.naturalWidth, height: selectedImage.naturalHeight });
+  } catch (error) {
+    selectedImage = null;
+    uploadPredictBtn.disabled = true;
+    setError("图片读取失败", error);
+  }
 });
 
 if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
