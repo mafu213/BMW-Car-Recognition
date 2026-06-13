@@ -27,11 +27,29 @@ python export_onnx.py --model_path checkpoints/best_model.pth --class_to_idx che
 导出结果：
 
 - `mobile_web/model/bmw_model.onnx`
+- `mobile_web/model/bmw_model_fp32.onnx`
+- `mobile_web/model/bmw_model_dynamic_quant.onnx`
 - `mobile_web/model/class_to_idx.json`
 - `mobile_web/model/idx_to_class.json`
 - `results/onnx_check.json`
 
 `results/onnx_check.json` 会记录 10 张测试图片的 PyTorch 与 ONNX 一致性检查结果。
+
+当前默认手机模型：
+
+```text
+mobile_web/model/bmw_model.onnx
+```
+
+GitHub Pages 模型直连测试地址：
+
+```text
+https://mafu213.github.io/BMW-Car-Recognition/model/bmw_model.onnx
+```
+
+如果该地址无法下载，说明 GitHub Pages 网络或模型路径存在问题。正常情况下模型大小约 5.80 MB，文件开头应为 ONNX 二进制内容，而不是 Git LFS 指针文本。
+
+量化说明：项目已生成 `bmw_model_dynamic_quant.onnx`，大小约 1.55 MB；但该动态量化模型包含 `ConvInteger`，当前 onnxruntime Python 检查即报 `NOT_IMPLEMENTED`，因此未作为浏览器默认模型。默认仍使用更兼容的 fp32 MobileNetV3-Small ONNX。
 
 ## 本地测试
 

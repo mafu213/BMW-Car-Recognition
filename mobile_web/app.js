@@ -1,5 +1,8 @@
 const MODEL_PATH = "model/bmw_model.onnx";
 const IDX_TO_CLASS_PATH = "model/idx_to_class.json";
+const MODEL_URL = new URL("./model/bmw_model.onnx", window.location.href).href;
+const IDX_TO_CLASS_URL = new URL("./model/idx_to_class.json", window.location.href).href;
+const VENDOR_URL = new URL("./vendor/", window.location.href).href;
 const CLASS_NAMES = {
   "28": "BMW 1 Series Coupe 2012",
   "29": "BMW 3 Series Sedan 2012",
@@ -9,6 +12,7 @@ const CLASS_NAMES = {
 const IMG_SIZE = 224;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
+const LOAD_TIMEOUT_MS = 180000;
 
 const modelStatus = document.getElementById("modelStatus");
 const readyBadge = document.getElementById("readyBadge");
@@ -34,9 +38,11 @@ let session = null;
 let idxToClass = {};
 let stream = null;
 let selectedImage = null;
+let loadStartedAt = 0;
 
 function logStep(message, data) {
-  const text = data === undefined ? message : `${message}: ${JSON.stringify(data)}`;
+  const elapsed = loadStartedAt ? `T+${((Date.now() - loadStartedAt) / 1000).toFixed(1)}s ` : "";
+  const text = data === undefined ? `${elapsed}${message}` : `${elapsed}${message}: ${JSON.stringify(data)}`;
   console.log(`[BMW] ${message}`, data === undefined ? "" : data);
   debugStatus.textContent = text;
 }
@@ -66,6 +72,61 @@ function setWorking(text) {
   confidence.textContent = "-";
   topkBars.innerHTML = "";
   logStep(text);
+}
+
+function withTimeout(promise, message, timeoutMs = LOAD_TIMEOUT_MS) {
+  let timerId;
+  const timeout = new Promise((_, reject) => {
+    timerId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timerId));
+}
+
+async function fetchArrayBufferWithStatus(url, label) {
+  logStep(`${label}下载中`, { url });
+  const response = await withTimeout(fetch(url, { cache: "force-cache" }), `${label}请求超过 ${Math.round(LOAD_TIMEOUT_MS / 1000)} 秒`);
+  if (!response.ok) {
+    throw new Error(`${label}文件下载失败：HTTP ${response.status}，URL=${url}`);
+  }
+
+  const total = Number(response.headers.get("content-length") || 0);
+  if (!response.body || !response.body.getReader) {
+    const buffer = await withTimeout(response.arrayBuffer(), `${label}读取超过 ${Math.round(LOAD_TIMEOUT_MS / 1000)} 秒`);
+    if (buffer.byteLength < 1024) {
+      throw new Error(`${label}文件异常，大小小于 1KB，可能是 Git LFS 指针文件或上传失败。URL=${url}`);
+    }
+    logStep(`${label}下载完成`, { bytes: buffer.byteLength, mb: (buffer.byteLength / 1024 / 1024).toFixed(2), url });
+    return buffer;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await withTimeout(reader.read(), `${label}下载中断或超时`);
+    if (done) {
+      break;
+    }
+    chunks.push(value);
+    received += value.length;
+    if (total) {
+      logStep(`${label}下载中`, { percent: `${((received / total) * 100).toFixed(1)}%`, received, total });
+    } else {
+      logStep(`${label}下载中`, { received });
+    }
+  }
+
+  const merged = new Uint8Array(received);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  });
+  if (merged.byteLength < 1024) {
+    throw new Error(`${label}文件异常，大小小于 1KB，可能是 Git LFS 指针文件或上传失败。URL=${url}`);
+  }
+  logStep(`${label}下载完成`, { bytes: merged.byteLength, mb: (merged.byteLength / 1024 / 1024).toFixed(2), url });
+  return merged.buffer;
 }
 
 function displayName(classId) {
@@ -238,27 +299,63 @@ async function captureAndPredict() {
 }
 
 async function loadModel() {
+  let phaseTimer = null;
   try {
+    loadStartedAt = Date.now();
     if (location.protocol === "file:") {
       setError("请通过 HTTP/HTTPS 打开，本地 file:// 无法加载模型。");
       return;
     }
-    logStep("模型加载中");
-    ort.env.wasm.wasmPaths = new URL("vendor/", window.location.href).href;
-    ort.env.wasm.numThreads = 1;
-    const timeout = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("模型加载超过 45 秒，请刷新页面或切换网络后重试。")), 45000);
+    logStep("模型加载中", {
+      origin: window.location.origin,
+      pathname: window.location.pathname,
+      modelUrl: MODEL_URL,
+      idxToClassUrl: IDX_TO_CLASS_URL,
+      wasmPath: VENDOR_URL,
     });
-    const classResponse = await Promise.race([fetch(IDX_TO_CLASS_PATH), timeout]);
+    modelStatus.textContent = "模型加载中：0-10 秒内请稍等";
+    phaseTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - loadStartedAt) / 1000);
+      if (elapsed >= 60) {
+        modelStatus.textContent = "模型加载较慢：超过 60 秒，如未完成请刷新或切换网络";
+      } else if (elapsed >= 30) {
+        modelStatus.textContent = "网络较慢，建议切换 Wi-Fi 或稍后重试";
+      } else if (elapsed >= 10) {
+        modelStatus.textContent = "模型较大，请继续等待";
+      }
+    }, 1000);
+
+    ort.env.wasm.wasmPaths = VENDOR_URL;
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.simd = false;
+    ort.env.wasm.proxy = false;
+    logStep("ONNX Runtime JS 已加载，wasmPaths 设置完成", {
+      ortVersion: ort.version || "unknown",
+      wasmPaths: ort.env.wasm.wasmPaths,
+      numThreads: ort.env.wasm.numThreads,
+      simd: ort.env.wasm.simd,
+    });
+
+    const classResponse = await withTimeout(fetch(IDX_TO_CLASS_URL, { cache: "force-cache" }), `类别文件加载超过 180 秒，URL=${IDX_TO_CLASS_URL}`);
+    if (!classResponse.ok) {
+      throw new Error(`类别文件加载失败：HTTP ${classResponse.status}，URL=${IDX_TO_CLASS_URL}`);
+    }
     idxToClass = await classResponse.json();
-    session = await Promise.race([ort.InferenceSession.create(MODEL_PATH, {
+    logStep("类别映射加载完成", idxToClass);
+
+    const modelBuffer = await fetchArrayBufferWithStatus(MODEL_URL, "ONNX 模型");
+    logStep("正在创建 ONNX 会话", { modelMb: (modelBuffer.byteLength / 1024 / 1024).toFixed(2) });
+    session = await withTimeout(ort.InferenceSession.create(modelBuffer, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
-    }), timeout]);
+    }), "ONNX 会话创建超过 180 秒");
     console.log("[BMW] ONNX inputNames", session.inputNames);
     console.log("[BMW] ONNX outputNames", session.outputNames);
-    setReady("模型加载完成，可拍照识别", true);
+    logStep("ONNX session 创建成功", { inputNames: session.inputNames, outputNames: session.outputNames });
+    if (phaseTimer) clearInterval(phaseTimer);
+    setReady(`模型加载完成，可拍照识别｜模型 ${(modelBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`, true);
   } catch (error) {
+    if (phaseTimer) clearInterval(phaseTimer);
     setError("模型加载失败", error);
   }
 }
