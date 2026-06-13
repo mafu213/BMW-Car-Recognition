@@ -110,7 +110,8 @@ async function fetchArrayBufferWithStatus(url, label) {
     chunks.push(value);
     received += value.length;
     if (total) {
-      logStep(`${label}下载中`, { percent: `${((received / total) * 100).toFixed(1)}%`, received, total });
+      const shownPercent = Math.min(100, (received / total) * 100);
+      logStep(`${label}下载中`, { percent: `${shownPercent.toFixed(1)}%`, received, total });
     } else {
       logStep(`${label}下载中`, { received });
     }
