@@ -1,0 +1,57 @@
+{
+  "dataset_root": "D:\\BMW\\BMW",
+  "structure_type": "train_test_with_val_split_from_train",
+  "seed": 2026,
+  "classes": [
+    "28",
+    "29",
+    "32",
+    "37"
+  ],
+  "class_descriptions": {
+    "28": "BMW 1 Series Coupe 2012",
+    "29": "BMW 3 Series Sedan 2012",
+    "32": "BMW X5 SUV 2007",
+    "37": "BMW X3 SUV 2012"
+  },
+  "total_images": 319,
+  "class_counts": {
+    "28": 80,
+    "29": 83,
+    "32": 81,
+    "37": 75
+  },
+  "split_counts": {
+    "train": {
+      "28": 32,
+      "29": 34,
+      "32": 33,
+      "37": 30
+    },
+    "val": {
+      "28": 8,
+      "29": 8,
+      "32": 8,
+      "37": 8
+    },
+    "test": {
+      "28": 40,
+      "29": 41,
+      "32": 40,
+      "37": 37
+    }
+  },
+  "split_totals": {
+    "train": 129,
+    "val": 32,
+    "test": 158
+  },
+  "imbalance": {
+    "max_count": 83,
+    "min_count": 75,
+    "max_min_ratio": 1.1067,
+    "majority_class": "29",
+    "minority_class": "37",
+    "is_imbalanced": false
+  }
+}

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BMW 车型识别</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="topbar">
+      <div>
+        <h1>BMW 车型识别</h1>
+        <p>{{ model_name }} · {{ device }}</p>
+      </div>
+      <span class="status {% if model_ready %}ready{% else %}error{% endif %}">
+        {% if model_ready %}模型就绪{% else %}模型未加载{% endif %}
+      </span>
+    </section>
+
+    {% if load_error %}
+    <section class="notice">
+      {{ load_error }}
+    </section>
+    {% endif %}
+
+    <section class="workspace">
+      <div class="preview-panel">
+        <img id="previewImage" alt="上传图片预览">
+        <div id="emptyPreview" class="empty-preview">选择 BMW 图片</div>
+      </div>
+
+      <div class="controls">
+        <label class="file-button" for="imageInput">选择图片</label>
+        <input id="imageInput" type="file" accept="image/*" capture="environment">
+        <button id="predictButton" type="button" disabled>开始识别</button>
+      </div>
+
+      <section id="resultPanel" class="result-panel">
+        <div class="result-main">
+          <span>预测车型</span>
+          <strong id="className">-</strong>
+        </div>
+        <div class="confidence">
+          <span>置信度</span>
+          <strong id="confidenceValue">-</strong>
+        </div>
+        <div id="bars" class="bars"></div>
+      </section>
+    </section>
+  </main>
+  <script src="/static/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+﻿split,class_name,description,count
+train,28,BMW 1 Series Coupe 2012,32
+train,29,BMW 3 Series Sedan 2012,34
+train,32,BMW X5 SUV 2007,33
+train,37,BMW X3 SUV 2012,30
+val,28,BMW 1 Series Coupe 2012,8
+val,29,BMW 3 Series Sedan 2012,8
+val,32,BMW X5 SUV 2007,8
+val,37,BMW X3 SUV 2012,8
+test,28,BMW 1 Series Coupe 2012,40
+test,29,BMW 3 Series Sedan 2012,41
+test,32,BMW X5 SUV 2007,40
+test,37,BMW X3 SUV 2012,37
+total,ALL,,319

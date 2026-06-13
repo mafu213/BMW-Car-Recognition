@@ -1,0 +1,15 @@
+{
+  "test_accuracy": 0.6962025316455697,
+  "macro_precision": 0.6954206839100866,
+  "macro_recall": 0.6970171390903098,
+  "macro_f1": 0.691792933880794,
+  "per_class_accuracy": {
+    "28": 0.9,
+    "29": 0.5853658536585366,
+    "32": 0.6,
+    "37": 0.7027027027027027
+  },
+  "model_name": "mobilenet_v3_small",
+  "model_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\checkpoints\\best_model.pth",
+  "test_samples": 158
+}
