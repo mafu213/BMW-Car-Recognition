@@ -33,21 +33,9 @@
       </div>
     </section>
 
-    <section class="panel tip-panel">
-      <h2>现场验收提示</h2>
-      <ol>
-        <li>打开网页后等待模型加载完成。</li>
-        <li>点击“打开摄像头”。</li>
-        <li>对准老师给的车辆图片。</li>
-        <li>点击“拍照识别”。</li>
-        <li>如果实时摄像头打不开，使用“拍照上传识别”。</li>
-      </ol>
-    </section>
-
     <section class="panel">
       <div class="section-head">
         <h2>摄像头识别</h2>
-        <p>优先调用 iPhone 后置摄像头，本地浏览器直接完成 ONNX 推理。</p>
       </div>
       <div class="camera-box">
         <video id="video" playsinline autoplay muted></video>
@@ -58,7 +46,7 @@
       <div class="button-row">
         <button id="openCameraBtn" type="button">打开摄像头</button>
         <button id="captureBtn" type="button" disabled>拍照识别</button>
-        <button id="retakeBtn" type="button">重新拍照</button>
+        <button id="retakeBtn" type="button">重置</button>
       </div>
     </section>
 
