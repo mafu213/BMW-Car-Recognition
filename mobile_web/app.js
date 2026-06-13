@@ -165,12 +165,15 @@ async function loadModel() {
     }
     ort.env.wasm.wasmPaths = new URL("vendor/", window.location.href).href;
     ort.env.wasm.numThreads = 1;
-    const classResponse = await fetch(IDX_TO_CLASS_PATH);
+    const timeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("模型加载超过 45 秒，请刷新页面或切换网络后重试。")), 45000);
+    });
+    const classResponse = await Promise.race([fetch(IDX_TO_CLASS_PATH), timeout]);
     idxToClass = await classResponse.json();
-    session = await ort.InferenceSession.create(MODEL_PATH, {
+    session = await Promise.race([ort.InferenceSession.create(MODEL_PATH, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
-    });
+    }), timeout]);
     setReady("模型已加载，可拍照识别", true);
   } catch (error) {
     console.error(error);
