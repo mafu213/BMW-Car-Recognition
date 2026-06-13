@@ -1,5 +1,6 @@
 const MODEL_PATH = "model/bmw_model.onnx";
 const IDX_TO_CLASS_PATH = "model/idx_to_class.json";
+const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX";
 const MODEL_URL = new URL("./model/bmw_model.onnx", window.location.href).href;
 const IDX_TO_CLASS_URL = new URL("./model/idx_to_class.json", window.location.href).href;
 const VENDOR_URL = new URL("./vendor/", window.location.href).href;
@@ -19,6 +20,8 @@ const readyBadge = document.getElementById("readyBadge");
 const predLabel = document.getElementById("predLabel");
 const confidence = document.getElementById("confidence");
 const topkBars = document.getElementById("topkBars");
+const modelDetails = document.getElementById("modelDetails");
+const debugStatus = document.getElementById("debugStatus");
 
 const video = document.getElementById("video");
 const captureCanvas = document.getElementById("captureCanvas");
@@ -29,6 +32,8 @@ const captureBtn = document.getElementById("captureBtn");
 const retakeBtn = document.getElementById("retakeBtn");
 const cameraFile = document.getElementById("cameraFile");
 const uploadPredictBtn = document.getElementById("uploadPredictBtn");
+const localFile = document.getElementById("localFile");
+const localPredictBtn = document.getElementById("localPredictBtn");
 const testModelBtn = document.getElementById("testModelBtn");
 const previewImage = document.getElementById("previewImage");
 const previewPlaceholder = document.getElementById("previewPlaceholder");
@@ -37,11 +42,42 @@ let session = null;
 let idxToClass = {};
 let stream = null;
 let selectedImage = null;
+let selectedLocalImage = null;
 let loadStartedAt = 0;
 
 function logStep(message, data) {
   const elapsed = loadStartedAt ? `T+${((Date.now() - loadStartedAt) / 1000).toFixed(1)}s ` : "";
   console.log(`[BMW] ${message}`, data === undefined ? "" : data);
+  if (debugStatus) {
+    const suffix = data === undefined ? "" : `｜${safeJson(data)}`;
+    debugStatus.textContent = `${elapsed}${message}${suffix}`;
+  }
+}
+
+function safeJson(data) {
+  try {
+    return JSON.stringify(data);
+  } catch (error) {
+    return String(data);
+  }
+}
+
+function formatMb(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function renderModelDetails(extra = {}) {
+  if (!modelDetails) return;
+  const lines = [
+    `当前模型：${MODEL_DISPLAY_NAME}`,
+    `模型路径：${MODEL_PATH}`,
+    `模型 URL：${MODEL_URL}`,
+  ];
+  if (extra.sizeBytes) lines.push(`模型大小：${formatMb(extra.sizeBytes)}`);
+  if (extra.inputNames) lines.push(`inputNames：${extra.inputNames.join(", ")}`);
+  if (extra.outputNames) lines.push(`outputNames：${extra.outputNames.join(", ")}`);
+  if (extra.ortVersion) lines.push(`ONNX Runtime：${extra.ortVersion}`);
+  modelDetails.innerHTML = lines.map((line) => `<div>${line}</div>`).join("");
 }
 
 function setReady(text, ok) {
@@ -60,6 +96,9 @@ function setError(text, error) {
   predLabel.textContent = fullText;
   confidence.textContent = "-";
   topkBars.innerHTML = "";
+  if (debugStatus) {
+    debugStatus.textContent = fullText;
+  }
   console.error(`[BMW] ${fullText}`, error || "");
 }
 
@@ -91,6 +130,10 @@ async function fetchArrayBufferWithStatus(url, label) {
     if (buffer.byteLength < 1024) {
       throw new Error(`${label}文件异常，大小小于 1KB，可能是 Git LFS 指针文件或上传失败。URL=${url}`);
     }
+    const prefix = new TextDecoder("utf-8").decode(new Uint8Array(buffer.slice(0, Math.min(96, buffer.byteLength))));
+    if (prefix.startsWith("version https://git-lfs.github.com/spec/v1")) {
+      throw new Error(`${label}是 Git LFS 指针文件，不是真实 ONNX 二进制。URL=${url}`);
+    }
     logStep(`${label}下载完成`, { bytes: buffer.byteLength, mb: (buffer.byteLength / 1024 / 1024).toFixed(2), url });
     return buffer;
   }
@@ -121,6 +164,10 @@ async function fetchArrayBufferWithStatus(url, label) {
   });
   if (merged.byteLength < 1024) {
     throw new Error(`${label}文件异常，大小小于 1KB，可能是 Git LFS 指针文件或上传失败。URL=${url}`);
+  }
+  const prefix = new TextDecoder("utf-8").decode(merged.slice(0, Math.min(96, merged.byteLength)));
+  if (prefix.startsWith("version https://git-lfs.github.com/spec/v1")) {
+    throw new Error(`${label}是 Git LFS 指针文件，不是真实 ONNX 二进制。URL=${url}`);
   }
   logStep(`${label}下载完成`, { bytes: merged.byteLength, mb: (merged.byteLength / 1024 / 1024).toFixed(2), url });
   return merged.buffer;
@@ -304,12 +351,14 @@ async function loadModel() {
       return;
     }
     logStep("模型加载中", {
+      modelName: MODEL_DISPLAY_NAME,
       origin: window.location.origin,
       pathname: window.location.pathname,
       modelUrl: MODEL_URL,
       idxToClassUrl: IDX_TO_CLASS_URL,
       wasmPath: VENDOR_URL,
     });
+    renderModelDetails({ ortVersion: ort.version || "unknown" });
     modelStatus.textContent = "模型加载中：0-10 秒内请稍等";
     phaseTimer = setInterval(() => {
       const elapsed = Math.floor((Date.now() - loadStartedAt) / 1000);
@@ -341,6 +390,7 @@ async function loadModel() {
     logStep("类别映射加载完成", idxToClass);
 
     const modelBuffer = await fetchArrayBufferWithStatus(MODEL_URL, "ONNX 模型");
+    renderModelDetails({ sizeBytes: modelBuffer.byteLength, ortVersion: ort.version || "unknown" });
     logStep("正在创建 ONNX 会话", { modelMb: (modelBuffer.byteLength / 1024 / 1024).toFixed(2) });
     session = await withTimeout(ort.InferenceSession.create(modelBuffer, {
       executionProviders: ["wasm"],
@@ -349,8 +399,14 @@ async function loadModel() {
     console.log("[BMW] ONNX inputNames", session.inputNames);
     console.log("[BMW] ONNX outputNames", session.outputNames);
     logStep("ONNX session 创建成功", { inputNames: session.inputNames, outputNames: session.outputNames });
+    renderModelDetails({
+      sizeBytes: modelBuffer.byteLength,
+      inputNames: session.inputNames,
+      outputNames: session.outputNames,
+      ortVersion: ort.version || "unknown",
+    });
     if (phaseTimer) clearInterval(phaseTimer);
-    setReady(`模型加载完成，可拍照识别｜模型 ${(modelBuffer.byteLength / 1024 / 1024).toFixed(2)} MB`, true);
+    setReady(`${MODEL_DISPLAY_NAME} 已加载｜${formatMb(modelBuffer.byteLength)}`, true);
   } catch (error) {
     if (phaseTimer) clearInterval(phaseTimer);
     setError("模型加载失败", error);
@@ -432,6 +488,18 @@ async function uploadAndPredict() {
   }
 }
 
+async function localUploadAndPredict() {
+  try {
+    if (!selectedLocalImage) {
+      throw new Error("请先选择本地图片");
+    }
+    logStep("使用本地图片识别");
+    await predictImage(selectedLocalImage);
+  } catch (error) {
+    setError("推理失败", error);
+  }
+}
+
 function createDemoCanvas() {
   const canvas = document.createElement("canvas");
   canvas.width = 640;
@@ -469,6 +537,7 @@ if (!openCameraBtn || !captureBtn) {
 }
 retakeBtn.addEventListener("click", resetResult);
 uploadPredictBtn.addEventListener("click", uploadAndPredict);
+localPredictBtn.addEventListener("click", localUploadAndPredict);
 testModelBtn.addEventListener("click", testModelInference);
 cameraFile.addEventListener("change", async () => {
   try {
@@ -479,6 +548,18 @@ cameraFile.addEventListener("change", async () => {
   } catch (error) {
     selectedImage = null;
     uploadPredictBtn.disabled = true;
+    setError("图片读取失败", error);
+  }
+});
+localFile.addEventListener("change", async () => {
+  try {
+    const file = localFile.files && localFile.files[0] ? localFile.files[0] : null;
+    selectedLocalImage = await loadFileToImage(file);
+    localPredictBtn.disabled = false;
+    logStep("已选择本地图片，可点击识别", { width: selectedLocalImage.naturalWidth, height: selectedLocalImage.naturalHeight });
+  } catch (error) {
+    selectedLocalImage = null;
+    localPredictBtn.disabled = true;
     setError("图片读取失败", error);
   }
 });
