@@ -203,6 +203,10 @@ button:disabled {
   background: #94a3b8;
 }
 
+.file-button.secondary {
+  background: #0f766e;
+}
+
 #retakeBtn {
   background: #e2e8f0;
   color: #0f172a;
@@ -215,29 +219,6 @@ input[type="file"] {
 .bars {
   display: grid;
   gap: 7px;
-}
-
-.debug-box {
-  display: grid;
-  gap: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--line);
-}
-
-.debug-box span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.debug-box pre {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: #334155;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .bar-row {
@@ -277,6 +258,23 @@ input[type="file"] {
   min-width: 2px;
   border-radius: 8px;
   background: linear-gradient(90deg, #2563eb, #0891b2);
+}
+
+.model-info {
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+#modelDetails,
+#debugStatus {
+  overflow-wrap: anywhere;
+}
+
+#debugStatus {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .classes-panel ul {

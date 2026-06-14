@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BMW 四类车型识别系统 - 电脑摄像头测试</title>
+  <link rel="stylesheet" href="style.css?v=20260614-efficientnet1">
+  <script src="./vendor/ort.min.js?v=20260614-efficientnet1"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>BMW 四类车型识别系统</h1>
+        <p id="modelStatus">EfficientNet-B0 ONNX 加载中...</p>
+      </div>
+      <span id="readyBadge" class="badge">准备中</span>
+    </header>
+
+    <section class="dashboard">
+      <section class="camera-panel panel">
+        <div class="section-head">
+          <h2>电脑摄像头识别</h2>
+          <p>localhost 下可直接调用电脑摄像头。</p>
+        </div>
+        <div class="camera-box">
+          <video id="video" playsinline autoplay muted></video>
+          <div id="cameraPlaceholder" class="placeholder">点击“打开摄像头”</div>
+        </div>
+        <canvas id="captureCanvas" hidden></canvas>
+        <div class="button-row">
+          <button id="openCameraBtn" type="button">打开摄像头</button>
+          <button id="captureBtn" type="button" disabled>拍照识别</button>
+          <button id="resetBtn" type="button" class="secondary">重置</button>
+        </div>
+      </section>
+
+      <section class="result-panel panel">
+        <h2>识别结果</h2>
+        <div class="result-card">
+          <span>预测车型</span>
+          <strong id="predLabel">等待识别</strong>
+        </div>
+        <div class="result-card">
+          <span>置信度</span>
+          <strong id="confidence">-</strong>
+        </div>
+        <div id="topkBars" class="bars"></div>
+      </section>
+    </section>
+
+    <section class="lower-grid">
+      <section class="panel">
+        <h2>本地图片上传识别</h2>
+        <label class="file-button" for="localFile">选择本地图片</label>
+        <input id="localFile" type="file" accept="image/*">
+        <button id="localPredictBtn" type="button" disabled>识别本地图片</button>
+        <div class="preview-box">
+          <img id="previewImage" alt="预览图片">
+          <div id="previewPlaceholder" class="placeholder">暂无图片</div>
+        </div>
+      </section>
+
+      <section class="panel debug-panel">
+        <h2>调试状态</h2>
+        <div id="modelDetails">模型信息等待加载。</div>
+        <pre id="debugStatus">等待操作。</pre>
+      </section>
+    </section>
+  </main>
+  <script src="app.js?v=20260614-efficientnet1"></script>
+</body>
+</html>
