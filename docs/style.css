@@ -123,11 +123,6 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-#confidence {
-  color: var(--brand-dark);
-  font-size: 28px;
-}
-
 .camera-box,
 .preview-box {
   position: relative;
@@ -258,23 +253,6 @@ input[type="file"] {
   min-width: 2px;
   border-radius: 8px;
   background: linear-gradient(90deg, #2563eb, #0891b2);
-}
-
-.model-info {
-  color: #334155;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-#modelDetails,
-#debugStatus {
-  overflow-wrap: anywhere;
-}
-
-#debugStatus {
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
 }
 
 .classes-panel ul {

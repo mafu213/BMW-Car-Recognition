@@ -94,7 +94,7 @@ function setError(text, error) {
   readyBadge.textContent = "不可用";
   readyBadge.className = "status error";
   predLabel.textContent = fullText;
-  confidence.textContent = "-";
+  if (confidence) confidence.textContent = "-";
   topkBars.innerHTML = "";
   if (debugStatus) {
     debugStatus.textContent = fullText;
@@ -104,7 +104,7 @@ function setError(text, error) {
 
 function setWorking(text) {
   predLabel.textContent = text;
-  confidence.textContent = "-";
+  if (confidence) confidence.textContent = "-";
   topkBars.innerHTML = "";
   logStep(text);
 }
@@ -226,7 +226,7 @@ function renderResult(topk) {
   }
   const best = topk[0];
   predLabel.textContent = best.label;
-  confidence.textContent = percent(best.prob);
+  if (confidence) confidence.textContent = percent(best.prob);
   renderTopK(topk);
   logStep("结果已显示", topk);
 }
@@ -449,7 +449,7 @@ async function openCamera() {
 
 function resetResult() {
   predLabel.textContent = "等待识别";
-  confidence.textContent = "-";
+  if (confidence) confidence.textContent = "-";
   topkBars.innerHTML = "";
   logStep("等待操作");
 }
