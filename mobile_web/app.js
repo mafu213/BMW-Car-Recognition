@@ -1,6 +1,6 @@
 const MODEL_PATH = "model/bmw_model.onnx";
 const IDX_TO_CLASS_PATH = "model/idx_to_class.json";
-const MODEL_VERSION = "efficientnet_b0_fix_202606_ui2";
+const MODEL_VERSION = "efficientnet_b0_fix_202606_ui3";
 const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX fixed";
 const MODEL_URL = new URL(`./model/bmw_model.onnx?v=${MODEL_VERSION}`, window.location.href).href;
 const IDX_TO_CLASS_URL = new URL(`./model/idx_to_class.json?v=${MODEL_VERSION}`, window.location.href).href;
@@ -16,6 +16,7 @@ const IMG_SIZE = 224;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
 const LOAD_TIMEOUT_MS = 180000;
+const USE_LIGHT_TTA = true;
 
 const modelStatus = document.getElementById("modelStatus");
 const readyBadge = document.getElementById("readyBadge");
@@ -87,7 +88,7 @@ function setError(text, error) {
   readyBadge.className = "status error";
   predLabel.textContent = fullText;
   if (confidence) confidence.textContent = "-";
-  topkBars.innerHTML = "";
+  if (topkBars) topkBars.innerHTML = "";
   if (debugStatus && text.includes("模型加载")) {
     debugStatus.textContent = fullText;
   }
@@ -97,7 +98,7 @@ function setError(text, error) {
 function setWorking(text) {
   predLabel.textContent = text;
   if (confidence) confidence.textContent = "-";
-  topkBars.innerHTML = "";
+  if (topkBars) topkBars.innerHTML = "";
   logStep(text);
 }
 
@@ -187,6 +188,7 @@ function softmax(logits) {
 }
 
 function renderTopK(items) {
+  if (!topkBars) return;
   topkBars.innerHTML = "";
   items.forEach((item) => {
     const row = document.createElement("div");
@@ -224,7 +226,7 @@ function renderResult(topk) {
   const best = topk[0];
   predLabel.textContent = best.label;
   if (confidence) confidence.textContent = percent(best.prob);
-  renderTopK(topk);
+  if (topkBars) topkBars.innerHTML = "";
   logStep("结果已显示", topk);
 }
 
@@ -261,9 +263,29 @@ function drawSourceToSquareCanvas(source) {
   return canvas;
 }
 
-function preprocess(source) {
+function drawSourceToContainCanvas(source) {
+  const canvas = document.createElement("canvas");
+  canvas.width = IMG_SIZE;
+  canvas.height = IMG_SIZE;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    throw new Error("无法创建 2D canvas context");
+  }
+  const { width, height } = getSourceSize(source);
+  ctx.fillStyle = `rgb(${Math.round(MEAN[0] * 255)}, ${Math.round(MEAN[1] * 255)}, ${Math.round(MEAN[2] * 255)})`;
+  ctx.fillRect(0, 0, IMG_SIZE, IMG_SIZE);
+  const scale = Math.min(IMG_SIZE / width, IMG_SIZE / height) * 0.96;
+  const drawWidth = width * scale;
+  const drawHeight = height * scale;
+  const dx = (IMG_SIZE - drawWidth) / 2;
+  const dy = (IMG_SIZE - drawHeight) / 2;
+  ctx.drawImage(source, 0, 0, width, height, dx, dy, drawWidth, drawHeight);
+  return canvas;
+}
+
+function preprocess(source, mode = "crop") {
   try {
-    const canvas = drawSourceToSquareCanvas(source);
+    const canvas = mode === "contain" ? drawSourceToContainCanvas(source) : drawSourceToSquareCanvas(source);
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     const imageData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
     if (!imageData || imageData.length !== IMG_SIZE * IMG_SIZE * 4) {
@@ -284,12 +306,26 @@ function preprocess(source) {
         input[2 * planeSize + outIndex] = (b - MEAN[2]) / STD[2];
       }
     }
-    logStep("图像预处理完成", { shape: [1, 3, IMG_SIZE, IMG_SIZE], length: input.length });
+    logStep("图像预处理完成", { mode, shape: [1, 3, IMG_SIZE, IMG_SIZE], length: input.length });
     console.log("[BMW] 输入 tensor shape", [1, 3, IMG_SIZE, IMG_SIZE]);
     return input;
   } catch (error) {
     throw new Error(`预处理失败：${error.message || error}`);
   }
+}
+
+function averageLogits(logitsList) {
+  if (!logitsList.length) {
+    throw new Error("推理失败：logits 为空");
+  }
+  const outputLength = logitsList[0].length;
+  const averaged = new Array(outputLength).fill(0);
+  logitsList.forEach((logits) => {
+    logits.forEach((value, index) => {
+      averaged[index] += value / logitsList.length;
+    });
+  });
+  return averaged;
 }
 
 async function predictImage(source) {
@@ -309,16 +345,21 @@ async function predictImage(source) {
   console.log("[BMW] ONNX inputNames", session.inputNames);
   console.log("[BMW] ONNX outputNames", session.outputNames);
 
-  const input = preprocess(source);
-  const tensor = new ort.Tensor("float32", input, [1, 3, IMG_SIZE, IMG_SIZE]);
-  logStep("开始推理", { inputName, outputName });
-  const results = await session.run({ [inputName]: tensor });
-  const output = results[outputName];
-  if (!output || !output.data) {
-    throw new Error(`推理失败：output tensor not found (${outputName})`);
+  const modes = USE_LIGHT_TTA ? ["crop", "contain"] : ["crop"];
+  const logitsList = [];
+  for (const mode of modes) {
+    const input = preprocess(source, mode);
+    const tensor = new ort.Tensor("float32", input, [1, 3, IMG_SIZE, IMG_SIZE]);
+    logStep("开始推理", { inputName, outputName, mode });
+    const results = await session.run({ [inputName]: tensor });
+    const output = results[outputName];
+    if (!output || !output.data) {
+      throw new Error(`推理失败：output tensor not found (${outputName})`);
+    }
+    logitsList.push(Array.from(output.data));
   }
 
-  const logits = Array.from(output.data);
+  const logits = averageLogits(logitsList);
   console.log("[BMW] logits", logits);
   const probs = softmax(logits);
   console.log("[BMW] softmax 概率", probs);
@@ -331,7 +372,7 @@ async function predictImage(source) {
     .sort((a, b) => b.prob - a.prob)
     .slice(0, 4);
   console.log("[BMW] Top-4 结果", topk);
-  logStep("推理完成", { outputName, logitsLength: logits.length });
+  logStep("推理完成", { outputName, logitsLength: logits.length, views: modes });
   renderResult(topk);
 }
 
@@ -465,7 +506,7 @@ async function openCamera() {
 function resetResult() {
   predLabel.textContent = "等待识别";
   if (confidence) confidence.textContent = "-";
-  topkBars.innerHTML = "";
+  if (topkBars) topkBars.innerHTML = "";
   logStep("等待操作");
 }
 
