@@ -1,6 +1,6 @@
 const MODEL_PATH = "model/bmw_model.onnx";
 const IDX_TO_CLASS_PATH = "model/idx_to_class.json";
-const MODEL_VERSION = "efficientnet_b0_fix_202606";
+const MODEL_VERSION = "efficientnet_b0_fix_202606_ui2";
 const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX fixed";
 const MODEL_URL = new URL(`./model/bmw_model.onnx?v=${MODEL_VERSION}`, window.location.href).href;
 const IDX_TO_CLASS_URL = new URL(`./model/idx_to_class.json?v=${MODEL_VERSION}`, window.location.href).href;
@@ -22,7 +22,6 @@ const readyBadge = document.getElementById("readyBadge");
 const predLabel = document.getElementById("predLabel");
 const confidence = document.getElementById("confidence");
 const topkBars = document.getElementById("topkBars");
-const modelDetails = document.getElementById("modelDetails");
 const debugStatus = document.getElementById("debugStatus");
 
 const video = document.getElementById("video");
@@ -51,9 +50,12 @@ let modelSizeBytes = 0;
 function logStep(message, data) {
   const elapsed = loadStartedAt ? `T+${((Date.now() - loadStartedAt) / 1000).toFixed(1)}s ` : "";
   console.log(`[BMW] ${message}`, data === undefined ? "" : data);
+}
+
+function setLoadProgress(message) {
+  const elapsed = loadStartedAt ? `T+${((Date.now() - loadStartedAt) / 1000).toFixed(1)}s ` : "";
   if (debugStatus) {
-    const suffix = data === undefined ? "" : `｜${safeJson(data)}`;
-    debugStatus.textContent = `${elapsed}${message}${suffix}`;
+    debugStatus.textContent = `${elapsed}${message}`;
   }
 }
 
@@ -69,27 +71,12 @@ function formatMb(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-function renderModelDetails(extra = {}) {
-  if (!modelDetails) return;
-  const lines = [
-    `当前模型：${MODEL_DISPLAY_NAME}`,
-    `模型版本：${MODEL_VERSION}`,
-    `模型路径：${MODEL_PATH}`,
-    `模型 URL：${MODEL_URL}`,
-    `类别 URL：${IDX_TO_CLASS_URL}`,
-  ];
-  if (extra.sizeBytes || modelSizeBytes) lines.push(`模型大小：${formatMb(extra.sizeBytes || modelSizeBytes)}`);
-  if (extra.inputNames) lines.push(`inputNames：${extra.inputNames.join(", ")}`);
-  if (extra.outputNames) lines.push(`outputNames：${extra.outputNames.join(", ")}`);
-  if (extra.ortVersion) lines.push(`ONNX Runtime：${extra.ortVersion}`);
-  modelDetails.innerHTML = lines.map((line) => `<div>${line}</div>`).join("");
-}
-
 function setReady(text, ok) {
   modelStatus.textContent = text;
   readyBadge.textContent = ok ? "模型就绪" : "准备中";
   readyBadge.className = ok ? "status ready" : "status";
   logStep(text);
+  setLoadProgress(ok ? "模型加载完成，可以开始识别。" : text);
 }
 
 function setError(text, error) {
@@ -101,7 +88,7 @@ function setError(text, error) {
   predLabel.textContent = fullText;
   if (confidence) confidence.textContent = "-";
   topkBars.innerHTML = "";
-  if (debugStatus) {
+  if (debugStatus && text.includes("模型加载")) {
     debugStatus.textContent = fullText;
   }
   console.error(`[BMW] ${fullText}`, error || "");
@@ -124,6 +111,7 @@ function withTimeout(promise, message, timeoutMs = LOAD_TIMEOUT_MS) {
 
 async function fetchArrayBufferWithStatus(url, label) {
   logStep(`${label}下载中`, { url });
+  setLoadProgress(`${label}下载中`);
   const response = await withTimeout(fetch(url, { cache: "no-store" }), `${label}请求超过 ${Math.round(LOAD_TIMEOUT_MS / 1000)} 秒`);
   if (!response.ok) {
     throw new Error(`${label}文件下载失败：HTTP ${response.status}，URL=${url}`);
@@ -140,6 +128,7 @@ async function fetchArrayBufferWithStatus(url, label) {
       throw new Error(`${label}是 Git LFS 指针文件，不是真实 ONNX 二进制。URL=${url}`);
     }
     logStep(`${label}下载完成`, { bytes: buffer.byteLength, mb: (buffer.byteLength / 1024 / 1024).toFixed(2), url });
+    setLoadProgress(`${label}下载完成，正在创建推理会话`);
     return buffer;
   }
 
@@ -156,8 +145,10 @@ async function fetchArrayBufferWithStatus(url, label) {
     if (total) {
       const shownPercent = Math.min(100, (received / total) * 100);
       logStep(`${label}下载中`, { percent: `${shownPercent.toFixed(1)}%`, received, total });
+      setLoadProgress(`${label}下载中 ${shownPercent.toFixed(1)}%`);
     } else {
       logStep(`${label}下载中`, { received });
+      setLoadProgress(`${label}下载中，已接收 ${(received / 1024 / 1024).toFixed(2)} MB`);
     }
   }
 
@@ -175,6 +166,7 @@ async function fetchArrayBufferWithStatus(url, label) {
     throw new Error(`${label}是 Git LFS 指针文件，不是真实 ONNX 二进制。URL=${url}`);
   }
   logStep(`${label}下载完成`, { bytes: merged.byteLength, mb: (merged.byteLength / 1024 / 1024).toFixed(2), url });
+  setLoadProgress(`${label}下载完成，正在创建推理会话`);
   return merged.buffer;
 }
 
@@ -341,21 +333,6 @@ async function predictImage(source) {
   console.log("[BMW] Top-4 结果", topk);
   logStep("推理完成", { outputName, logitsLength: logits.length });
   renderResult(topk);
-  if (debugStatus) {
-    debugStatus.textContent = safeJson({
-      modelName: MODEL_DISPLAY_NAME,
-      modelVersion: MODEL_VERSION,
-      modelUrl: MODEL_URL,
-      modelSize: formatMb(modelSizeBytes),
-      inputNames: session.inputNames,
-      outputNames: session.outputNames,
-      outputShape: output.dims || output.size || null,
-      logits,
-      softmax: classProbabilities,
-      top4: topk,
-      idxToClass,
-    });
-  }
 }
 
 async function captureAndPredict() {
@@ -382,6 +359,7 @@ async function loadModel() {
   let phaseTimer = null;
   try {
     loadStartedAt = Date.now();
+    setLoadProgress("模型加载中：准备加载运行环境");
     if (location.protocol === "file:") {
       setError("请通过 HTTP/HTTPS 打开，本地 file:// 无法加载模型。");
       return;
@@ -394,16 +372,19 @@ async function loadModel() {
       idxToClassUrl: IDX_TO_CLASS_URL,
       wasmPath: VENDOR_URL,
     });
-    renderModelDetails({ ortVersion: ort.version || "unknown" });
     modelStatus.textContent = "模型加载中：0-10 秒内请稍等";
+    setLoadProgress("模型加载中：0-10 秒内请稍等");
     phaseTimer = setInterval(() => {
       const elapsed = Math.floor((Date.now() - loadStartedAt) / 1000);
       if (elapsed >= 60) {
         modelStatus.textContent = "模型加载较慢：超过 60 秒，如未完成请刷新或切换网络";
+        setLoadProgress("模型加载较慢：超过 60 秒，如未完成请刷新或切换网络");
       } else if (elapsed >= 30) {
         modelStatus.textContent = "网络较慢，建议切换 Wi-Fi 或稍后重试";
+        setLoadProgress("网络较慢，建议切换 Wi-Fi 或稍后重试");
       } else if (elapsed >= 10) {
         modelStatus.textContent = "模型较大，请继续等待";
+        setLoadProgress("模型较大，请继续等待");
       }
     }, 1000);
 
@@ -417,6 +398,7 @@ async function loadModel() {
       numThreads: ort.env.wasm.numThreads,
       simd: ort.env.wasm.simd,
     });
+    setLoadProgress("ONNX Runtime 已加载，正在读取类别文件");
 
     const classResponse = await withTimeout(fetch(IDX_TO_CLASS_URL, { cache: "no-store" }), `类别文件加载超过 180 秒，URL=${IDX_TO_CLASS_URL}`);
     if (!classResponse.ok) {
@@ -424,11 +406,12 @@ async function loadModel() {
     }
     idxToClass = await classResponse.json();
     logStep("类别映射加载完成", idxToClass);
+    setLoadProgress("类别文件加载完成，正在下载模型");
 
     const modelBuffer = await fetchArrayBufferWithStatus(MODEL_URL, "ONNX 模型");
     modelSizeBytes = modelBuffer.byteLength;
-    renderModelDetails({ sizeBytes: modelBuffer.byteLength, ortVersion: ort.version || "unknown" });
     logStep("正在创建 ONNX 会话", { modelMb: (modelBuffer.byteLength / 1024 / 1024).toFixed(2) });
+    setLoadProgress("模型下载完成，正在创建推理会话");
     session = await withTimeout(ort.InferenceSession.create(modelBuffer, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
@@ -436,12 +419,7 @@ async function loadModel() {
     console.log("[BMW] ONNX inputNames", session.inputNames);
     console.log("[BMW] ONNX outputNames", session.outputNames);
     logStep("ONNX session 创建成功", { inputNames: session.inputNames, outputNames: session.outputNames });
-    renderModelDetails({
-      sizeBytes: modelBuffer.byteLength,
-      inputNames: session.inputNames,
-      outputNames: session.outputNames,
-      ortVersion: ort.version || "unknown",
-    });
+    setLoadProgress("推理会话创建成功");
     if (phaseTimer) clearInterval(phaseTimer);
     setReady(`${MODEL_DISPLAY_NAME} 已加载｜${formatMb(modelBuffer.byteLength)}`, true);
   } catch (error) {
