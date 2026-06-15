@@ -255,6 +255,39 @@ input[type="file"] {
   background: linear-gradient(90deg, #2563eb, #0891b2);
 }
 
+.debug-panel {
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.audit-canvas {
+  width: min(224px, 100%);
+  height: auto;
+  justify-self: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0f172a;
+  image-rendering: auto;
+}
+
+#modelDetails,
+#debugStatus {
+  overflow-wrap: anywhere;
+}
+
+#debugStatus {
+  min-height: 120px;
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #dbeafe;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .classes-panel ul {
   display: grid;
   gap: 8px;

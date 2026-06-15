@@ -1,0 +1,58 @@
+[
+  {
+    "path": "checkpoints/best_model.pth",
+    "bytes": 16327729,
+    "mb": 15.57,
+    "sha256": "9a0daec258ab4910423ea9dd66f76177e7a9603ea9f9f460fa971fbe50ba32ae",
+    "lfs_pointer": false
+  },
+  {
+    "path": "checkpoints/best_model_boost.pth",
+    "bytes": 16327729,
+    "mb": 15.57,
+    "sha256": "9a0daec258ab4910423ea9dd66f76177e7a9603ea9f9f460fa971fbe50ba32ae",
+    "lfs_pointer": false
+  },
+  {
+    "path": "runs_accuracy_boost/efficientnet_b0/best_model.pth",
+    "bytes": 16327729,
+    "mb": 15.57,
+    "sha256": "9a0daec258ab4910423ea9dd66f76177e7a9603ea9f9f460fa971fbe50ba32ae",
+    "lfs_pointer": false
+  },
+  {
+    "path": "mobile_web/model/bmw_model.onnx",
+    "bytes": 15997277,
+    "mb": 15.26,
+    "sha256": "e984a6a4a289831596ec17f457d302ab95dab226e593e4b0a2cc6a4725851965",
+    "lfs_pointer": false
+  },
+  {
+    "path": "desktop_web/model/bmw_model.onnx",
+    "bytes": 15997277,
+    "mb": 15.26,
+    "sha256": "e984a6a4a289831596ec17f457d302ab95dab226e593e4b0a2cc6a4725851965",
+    "lfs_pointer": false
+  },
+  {
+    "path": "docs/model/bmw_model.onnx",
+    "bytes": 15997277,
+    "mb": 15.26,
+    "sha256": "e984a6a4a289831596ec17f457d302ab95dab226e593e4b0a2cc6a4725851965",
+    "lfs_pointer": false
+  },
+  {
+    "path": "docs/desktop_web/model/bmw_model.onnx",
+    "bytes": 15997277,
+    "mb": 15.26,
+    "sha256": "e984a6a4a289831596ec17f457d302ab95dab226e593e4b0a2cc6a4725851965",
+    "lfs_pointer": false
+  },
+  {
+    "path": "mobile_web/model/bmw_model_boost_efficientnet_b0.onnx",
+    "bytes": 15997277,
+    "mb": 15.26,
+    "sha256": "e984a6a4a289831596ec17f457d302ab95dab226e593e4b0a2cc6a4725851965",
+    "lfs_pointer": false
+  }
+]

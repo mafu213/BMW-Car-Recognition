@@ -1,9 +1,11 @@
 const MODEL_PATH = "model/bmw_model.onnx";
 const IDX_TO_CLASS_PATH = "model/idx_to_class.json";
-const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX";
-const MODEL_URL = new URL("./model/bmw_model.onnx", window.location.href).href;
-const IDX_TO_CLASS_URL = new URL("./model/idx_to_class.json", window.location.href).href;
+const MODEL_VERSION = "efficientnet_b0_fix_202606";
+const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX fixed";
+const MODEL_URL = new URL(`./model/bmw_model.onnx?v=${MODEL_VERSION}`, window.location.href).href;
+const IDX_TO_CLASS_URL = new URL(`./model/idx_to_class.json?v=${MODEL_VERSION}`, window.location.href).href;
 const VENDOR_URL = new URL("./vendor/", window.location.href).href;
+const CLASS_IDS = ["28", "29", "32", "37"];
 const CLASS_NAMES = {
   "28": "BMW 1 Series Coupe 2012",
   "29": "BMW 3 Series Sedan 2012",
@@ -44,6 +46,7 @@ let stream = null;
 let selectedImage = null;
 let selectedLocalImage = null;
 let loadStartedAt = 0;
+let modelSizeBytes = 0;
 
 function logStep(message, data) {
   const elapsed = loadStartedAt ? `T+${((Date.now() - loadStartedAt) / 1000).toFixed(1)}s ` : "";
@@ -70,10 +73,12 @@ function renderModelDetails(extra = {}) {
   if (!modelDetails) return;
   const lines = [
     `当前模型：${MODEL_DISPLAY_NAME}`,
+    `模型版本：${MODEL_VERSION}`,
     `模型路径：${MODEL_PATH}`,
     `模型 URL：${MODEL_URL}`,
+    `类别 URL：${IDX_TO_CLASS_URL}`,
   ];
-  if (extra.sizeBytes) lines.push(`模型大小：${formatMb(extra.sizeBytes)}`);
+  if (extra.sizeBytes || modelSizeBytes) lines.push(`模型大小：${formatMb(extra.sizeBytes || modelSizeBytes)}`);
   if (extra.inputNames) lines.push(`inputNames：${extra.inputNames.join(", ")}`);
   if (extra.outputNames) lines.push(`outputNames：${extra.outputNames.join(", ")}`);
   if (extra.ortVersion) lines.push(`ONNX Runtime：${extra.ortVersion}`);
@@ -119,7 +124,7 @@ function withTimeout(promise, message, timeoutMs = LOAD_TIMEOUT_MS) {
 
 async function fetchArrayBufferWithStatus(url, label) {
   logStep(`${label}下载中`, { url });
-  const response = await withTimeout(fetch(url, { cache: "force-cache" }), `${label}请求超过 ${Math.round(LOAD_TIMEOUT_MS / 1000)} 秒`);
+  const response = await withTimeout(fetch(url, { cache: "no-store" }), `${label}请求超过 ${Math.round(LOAD_TIMEOUT_MS / 1000)} 秒`);
   if (!response.ok) {
     throw new Error(`${label}文件下载失败：HTTP ${response.status}，URL=${url}`);
   }
@@ -237,6 +242,15 @@ function showPreviewFromCanvas(canvas) {
   previewPlaceholder.hidden = true;
 }
 
+function getSourceSize(source) {
+  const width = source.videoWidth || source.naturalWidth || source.width;
+  const height = source.videoHeight || source.naturalHeight || source.height;
+  if (!width || !height) {
+    throw new Error(`无法读取图像尺寸：${width || 0}x${height || 0}`);
+  }
+  return { width, height };
+}
+
 function drawSourceToSquareCanvas(source) {
   const canvas = document.createElement("canvas");
   canvas.width = IMG_SIZE;
@@ -245,7 +259,13 @@ function drawSourceToSquareCanvas(source) {
   if (!ctx) {
     throw new Error("无法创建 2D canvas context");
   }
-  ctx.drawImage(source, 0, 0, IMG_SIZE, IMG_SIZE);
+  const { width, height } = getSourceSize(source);
+  const scale = Math.max(IMG_SIZE / width, IMG_SIZE / height);
+  const cropWidth = IMG_SIZE / scale;
+  const cropHeight = IMG_SIZE / scale;
+  const sx = Math.max(0, (width - cropWidth) / 2);
+  const sy = Math.max(0, (height - cropHeight) / 2);
+  ctx.drawImage(source, sx, sy, cropWidth, cropHeight, 0, 0, IMG_SIZE, IMG_SIZE);
   return canvas;
 }
 
@@ -310,16 +330,32 @@ async function predictImage(source) {
   console.log("[BMW] logits", logits);
   const probs = softmax(logits);
   console.log("[BMW] softmax 概率", probs);
-  const topk = probs
-    .map((prob, index) => {
-      const classId = idxToClass[String(index)] || String(index);
-      return { label: displayName(classId), prob };
-    })
+  const classProbabilities = probs.map((prob, index) => {
+    const classId = idxToClass[String(index)] || String(index);
+    return { index, classId, label: displayName(classId), prob, percent: percent(prob) };
+  });
+  const topk = classProbabilities
+    .slice()
     .sort((a, b) => b.prob - a.prob)
     .slice(0, 4);
   console.log("[BMW] Top-4 结果", topk);
   logStep("推理完成", { outputName, logitsLength: logits.length });
   renderResult(topk);
+  if (debugStatus) {
+    debugStatus.textContent = safeJson({
+      modelName: MODEL_DISPLAY_NAME,
+      modelVersion: MODEL_VERSION,
+      modelUrl: MODEL_URL,
+      modelSize: formatMb(modelSizeBytes),
+      inputNames: session.inputNames,
+      outputNames: session.outputNames,
+      outputShape: output.dims || output.size || null,
+      logits,
+      softmax: classProbabilities,
+      top4: topk,
+      idxToClass,
+    });
+  }
 }
 
 async function captureAndPredict() {
@@ -382,7 +418,7 @@ async function loadModel() {
       simd: ort.env.wasm.simd,
     });
 
-    const classResponse = await withTimeout(fetch(IDX_TO_CLASS_URL, { cache: "force-cache" }), `类别文件加载超过 180 秒，URL=${IDX_TO_CLASS_URL}`);
+    const classResponse = await withTimeout(fetch(IDX_TO_CLASS_URL, { cache: "no-store" }), `类别文件加载超过 180 秒，URL=${IDX_TO_CLASS_URL}`);
     if (!classResponse.ok) {
       throw new Error(`类别文件加载失败：HTTP ${classResponse.status}，URL=${IDX_TO_CLASS_URL}`);
     }
@@ -390,6 +426,7 @@ async function loadModel() {
     logStep("类别映射加载完成", idxToClass);
 
     const modelBuffer = await fetchArrayBufferWithStatus(MODEL_URL, "ONNX 模型");
+    modelSizeBytes = modelBuffer.byteLength;
     renderModelDetails({ sizeBytes: modelBuffer.byteLength, ortVersion: ort.version || "unknown" });
     logStep("正在创建 ONNX 会话", { modelMb: (modelBuffer.byteLength / 1024 / 1024).toFixed(2) });
     session = await withTimeout(ort.InferenceSession.create(modelBuffer, {

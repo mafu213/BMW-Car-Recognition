@@ -1,15 +1,23 @@
 {
-  "test_accuracy": 0.6962025316455697,
-  "macro_precision": 0.6954206839100866,
-  "macro_recall": 0.6970171390903098,
-  "macro_f1": 0.691792933880794,
+  "model_name": "efficientnet_b0",
+  "best_val_accuracy": 0.875,
+  "best_epoch": 19,
+  "test_accuracy": 0.953125,
+  "test_accuracy_tta": 0.953125,
+  "macro_precision": 0.9605263157894737,
+  "macro_recall": 0.9530024509803923,
+  "macro_f1": 0.9543104652114663,
   "per_class_accuracy": {
-    "28": 0.9,
-    "29": 0.5853658536585366,
-    "32": 0.6,
-    "37": 0.7027027027027027
+    "28": 0.9375,
+    "29": 0.9411764705882353,
+    "32": 1.0,
+    "37": 0.9333333333333333
   },
-  "model_name": "mobilenet_v3_small",
-  "model_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\checkpoints\\best_model.pth",
-  "test_samples": 158
+  "pretrained_ok": true,
+  "warning": null,
+  "checkpoint_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\runs_accuracy_boost\\efficientnet_b0\\best_model.pth",
+  "confusion_matrix_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\runs_accuracy_boost\\efficientnet_b0\\confusion_matrix_tta.png",
+  "accuracy_curve_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\runs_accuracy_boost\\efficientnet_b0\\efficientnet_b0_accuracy_curve.png",
+  "loss_curve_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\runs_accuracy_boost\\efficientnet_b0\\efficientnet_b0_loss_curve.png",
+  "elapsed_seconds": 436.8
 }

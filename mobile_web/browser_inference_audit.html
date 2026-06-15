@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>BMW ONNX 浏览器推理审计</title>
+  <link rel="stylesheet" href="style.css?v=efficientnet_b0_fix_202606">
+  <script src="./vendor/ort.min.js?v=efficientnet_b0_fix_202606"></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <h1>BMW ONNX 浏览器推理审计</h1>
+        <p id="modelStatus">EfficientNet-B0 ONNX fixed 加载中...</p>
+      </div>
+      <span id="readyBadge" class="status">准备中</span>
+    </header>
+
+    <section class="panel">
+      <h2>上传测试图片</h2>
+      <label class="file-button" for="auditFile">选择图片并推理</label>
+      <input id="auditFile" type="file" accept="image/*">
+    </section>
+
+    <section class="result-card">
+      <div>
+        <span>预测车型</span>
+        <strong id="predLabel">等待识别</strong>
+      </div>
+      <div id="topkBars" class="bars"></div>
+    </section>
+
+    <section class="panel">
+      <h2>224×224 预处理图</h2>
+      <canvas id="preprocessCanvas" width="224" height="224" class="audit-canvas"></canvas>
+    </section>
+
+    <section class="panel debug-panel">
+      <h2>推理调试</h2>
+      <div id="modelDetails">等待模型加载。</div>
+      <pre id="debugStatus">等待操作。</pre>
+    </section>
+  </main>
+  <script src="browser_inference_audit.js?v=efficientnet_b0_fix_202606"></script>
+</body>
+</html>

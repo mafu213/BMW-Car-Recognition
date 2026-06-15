@@ -1,10 +1,12 @@
-const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX";
-const MODEL_URL = new URL("./model/bmw_model.onnx", window.location.href).href;
-const IDX_TO_CLASS_URL = new URL("./model/idx_to_class.json", window.location.href).href;
+const MODEL_VERSION = "efficientnet_b0_fix_202606";
+const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX fixed";
+const MODEL_URL = new URL(`./model/bmw_model.onnx?v=${MODEL_VERSION}`, window.location.href).href;
+const IDX_TO_CLASS_URL = new URL(`./model/idx_to_class.json?v=${MODEL_VERSION}`, window.location.href).href;
 const VENDOR_URL = new URL("./vendor/", window.location.href).href;
 const IMG_SIZE = 224;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
+const CLASS_IDS = ["28", "29", "32", "37"];
 const CLASS_NAMES = {
   "28": "BMW 1 Series Coupe 2012",
   "29": "BMW 3 Series Sedan 2012",
@@ -57,6 +59,7 @@ function formatMb(bytes) {
 function renderModelDetails(extra = {}) {
   const lines = [
     `当前模型：${MODEL_DISPLAY_NAME}`,
+    `模型版本：${MODEL_VERSION}`,
     `模型 URL：${MODEL_URL}`,
     `类别 URL：${IDX_TO_CLASS_URL}`,
     `WASM 路径：${VENDOR_URL}`,
@@ -152,13 +155,28 @@ function renderResult(topk) {
   setDebug("结果已显示", topk);
 }
 
+function getSourceSize(source) {
+  const width = source.videoWidth || source.naturalWidth || source.width;
+  const height = source.videoHeight || source.naturalHeight || source.height;
+  if (!width || !height) {
+    throw new Error(`无法读取图像尺寸：${width || 0}x${height || 0}`);
+  }
+  return { width, height };
+}
+
 function drawSourceToSquareCanvas(source) {
   const canvas = document.createElement("canvas");
   canvas.width = IMG_SIZE;
   canvas.height = IMG_SIZE;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("无法创建 2D canvas context");
-  ctx.drawImage(source, 0, 0, IMG_SIZE, IMG_SIZE);
+  const { width, height } = getSourceSize(source);
+  const scale = Math.max(IMG_SIZE / width, IMG_SIZE / height);
+  const cropWidth = IMG_SIZE / scale;
+  const cropHeight = IMG_SIZE / scale;
+  const sx = Math.max(0, (width - cropWidth) / 2);
+  const sy = Math.max(0, (height - cropHeight) / 2);
+  ctx.drawImage(source, sx, sy, cropWidth, cropHeight, 0, 0, IMG_SIZE, IMG_SIZE);
   return canvas;
 }
 
@@ -199,15 +217,30 @@ async function predictImage(source) {
   const results = await session.run({ [inputName]: tensor });
   const output = results[outputName];
   if (!output || !output.data) throw new Error(`session.run 失败：output tensor not found (${outputName})`);
-  const probs = softmax(Array.from(output.data));
-  const topk = probs
-    .map((prob, index) => {
-      const classId = idxToClass[String(index)] || String(index);
-      return { label: displayName(classId), prob };
-    })
+  const logits = Array.from(output.data);
+  const probs = softmax(logits);
+  const classProbabilities = probs.map((prob, index) => {
+    const classId = idxToClass[String(index)] || String(index);
+    return { index, classId, label: displayName(classId), prob, percent: percent(prob) };
+  });
+  const topk = classProbabilities
+    .slice()
     .sort((a, b) => b.prob - a.prob)
     .slice(0, 4);
   renderResult(topk);
+  setDebug("推理完成", {
+    modelName: MODEL_DISPLAY_NAME,
+    modelVersion: MODEL_VERSION,
+    modelUrl: MODEL_URL,
+    modelSize: formatMb(modelSizeBytes),
+    inputNames: session.inputNames,
+    outputNames: session.outputNames,
+    outputShape: output.dims || output.size || null,
+    logits,
+    softmax: classProbabilities,
+    top4: topk,
+    idxToClass,
+  });
 }
 
 async function loadModel() {

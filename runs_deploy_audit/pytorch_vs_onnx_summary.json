@@ -1,0 +1,30 @@
+{
+  "samples": 60,
+  "pytorch_onnx_top1_match": 60,
+  "old_web_stretch_matches_onnx_eval": 55,
+  "fixed_web_crop_matches_onnx_eval": 58,
+  "old_web_stretch_top1_counts": {
+    "28": 14,
+    "29": 14,
+    "32": 17,
+    "37": 15
+  },
+  "fixed_web_crop_top1_counts": {
+    "28": 14,
+    "29": 16,
+    "32": 15,
+    "37": 15
+  },
+  "onnx_eval_top1_counts": {
+    "28": 12,
+    "29": 17,
+    "32": 15,
+    "37": 16
+  },
+  "max_logits_error": 1.1444091796875e-05,
+  "pytorch_onnx_top1_match_rate": 1.0,
+  "old_web_stretch_match_rate": 0.9166666666666666,
+  "fixed_web_crop_match_rate": 0.9666666666666667,
+  "csv_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\runs_deploy_audit\\pytorch_vs_onnx.csv",
+  "web_check_expected_csv_path": "C:\\Users\\Administrator\\Documents\\Codex\\2026-06-13\\windows-bmw-d-bmw-bmw-iphone\\BMW-Car-Recognition\\runs_deploy_audit\\web_check_expected.csv"
+}

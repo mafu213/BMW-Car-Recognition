@@ -1,0 +1,56 @@
+{
+  "checkpoints/class_to_idx.json": {
+    "28": 0,
+    "29": 1,
+    "32": 2,
+    "37": 3
+  },
+  "mobile_web/model/class_to_idx.json": {
+    "28": 0,
+    "29": 1,
+    "32": 2,
+    "37": 3
+  },
+  "mobile_web/model/idx_to_class.json": {
+    "0": "28",
+    "1": "29",
+    "2": "32",
+    "3": "37"
+  },
+  "desktop_web/model/class_to_idx.json": {
+    "28": 0,
+    "29": 1,
+    "32": 2,
+    "37": 3
+  },
+  "desktop_web/model/idx_to_class.json": {
+    "0": "28",
+    "1": "29",
+    "2": "32",
+    "3": "37"
+  },
+  "docs/model/class_to_idx.json": {
+    "28": 0,
+    "29": 1,
+    "32": 2,
+    "37": 3
+  },
+  "docs/model/idx_to_class.json": {
+    "0": "28",
+    "1": "29",
+    "2": "32",
+    "3": "37"
+  },
+  "docs/desktop_web/model/class_to_idx.json": {
+    "28": 0,
+    "29": 1,
+    "32": 2,
+    "37": 3
+  },
+  "docs/desktop_web/model/idx_to_class.json": {
+    "0": "28",
+    "1": "29",
+    "2": "32",
+    "3": "37"
+  }
+}

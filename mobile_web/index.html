@@ -7,8 +7,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=20260614-clean1">
-  <script src="./vendor/ort.min.js?v=20260614-clean1"></script>
+  <link rel="stylesheet" href="style.css?v=efficientnet_b0_fix_202606">
+  <script src="./vendor/ort.min.js?v=efficientnet_b0_fix_202606"></script>
 </head>
 <body>
   <main class="app-shell">
@@ -26,6 +26,12 @@
         <strong id="predLabel">等待识别</strong>
       </div>
       <div id="topkBars" class="bars"></div>
+    </section>
+
+    <section class="panel debug-panel">
+      <h2>调试输出</h2>
+      <div id="modelDetails">当前模型：EfficientNet-B0 ONNX fixed</div>
+      <pre id="debugStatus">等待模型加载。</pre>
     </section>
 
     <section class="panel">
@@ -77,6 +83,6 @@
       </ul>
     </section>
   </main>
-  <script src="app.js?v=20260614-clean1"></script>
+  <script src="app.js?v=efficientnet_b0_fix_202606"></script>
 </body>
 </html>
