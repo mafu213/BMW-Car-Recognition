@@ -1,6 +1,6 @@
 const MODEL_PATH = "model/bmw_model.onnx";
 const IDX_TO_CLASS_PATH = "model/idx_to_class.json";
-const MODEL_VERSION = "efficientnet_b0_fix_202606_ui3";
+const MODEL_VERSION = "efficientnet_b0_fix_202606_ui4";
 const MODEL_DISPLAY_NAME = "EfficientNet-B0 ONNX fixed";
 const MODEL_URL = new URL(`./model/bmw_model.onnx?v=${MODEL_VERSION}`, window.location.href).href;
 const IDX_TO_CLASS_URL = new URL(`./model/idx_to_class.json?v=${MODEL_VERSION}`, window.location.href).href;
@@ -17,6 +17,7 @@ const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
 const LOAD_TIMEOUT_MS = 180000;
 const USE_LIGHT_TTA = true;
+const LOGIT_BIAS = [0, -0.9, 0, 0];
 
 const modelStatus = document.getElementById("modelStatus");
 const readyBadge = document.getElementById("readyBadge");
@@ -359,7 +360,7 @@ async function predictImage(source) {
     logitsList.push(Array.from(output.data));
   }
 
-  const logits = averageLogits(logitsList);
+  const logits = averageLogits(logitsList).map((value, index) => value + (LOGIT_BIAS[index] || 0));
   console.log("[BMW] logits", logits);
   const probs = softmax(logits);
   console.log("[BMW] softmax 概率", probs);
